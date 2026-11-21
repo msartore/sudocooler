@@ -25,12 +25,35 @@ pub fn screen(state: AppState) -> impl IntoElement {
                     .gap_2()
                     .child(
                         text(move || {
-                            state
+                            let hex = state
                                 .packets
                                 .get()
                                 .latest()
                                 .map(|entry| entry.hex.clone())
-                                .unwrap_or_else(|| "Waiting for the first sample...".to_owned())
+                                .unwrap_or_default();
+                            if hex.is_empty() {
+                                "Waiting for the first sample...".to_owned()
+                            } else {
+                                hex.chars().take(64).collect()
+                            }
+                        })
+                        .font_family(
+                            theme()
+                                .font_mono
+                                .clone()
+                                .unwrap_or_else(|| "monospace".into()),
+                        )
+                        .text_size(px(12.0))
+                        .text_color(move || theme().foreground),
+                    )
+                    .child(
+                        text(move || {
+                            state
+                                .packets
+                                .get()
+                                .latest()
+                                .map(|entry| entry.hex.chars().skip(64).collect::<String>())
+                                .unwrap_or_default()
                         })
                         .font_family(
                             theme()
