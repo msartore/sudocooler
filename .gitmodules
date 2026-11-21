@@ -1,0 +1,3 @@
+[submodule "sudokooler"]
+	path = sudokooler
+	url = https://github.com/BGW-10/sudokooler.git

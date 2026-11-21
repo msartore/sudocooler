@@ -1,0 +1,37 @@
+{
+  "cssVars": {
+    "theme": {
+      "radius": "0.75rem",
+      "font-sans": "system-ui, -apple-system, Segoe UI, sans-serif",
+      "font-mono": "ui-monospace, SFMono-Regular, Consolas, monospace"
+    },
+    "light": {
+      "primary": "oklch(0.55 0.16 244)",
+      "primary-foreground": "#ffffff",
+      "secondary": "#e8edf3",
+      "muted-foreground": "#64748b",
+      "border": "#dbe2ea",
+      "success": "#15803d",
+      "warning": "#b45309",
+      "danger": "#b91c1c",
+      "display-bg": "#0b1220",
+      "display-on": "#ffb454",
+      "display-off": "#2c3646",
+      "display-bar": "#38bdf8"
+    },
+    "dark": {
+      "primary": "oklch(0.72 0.15 240)",
+      "primary-foreground": "#0b1220",
+      "secondary": "#1e293b",
+      "muted-foreground": "#94a3b8",
+      "border": "#263449",
+      "success": "#4ade80",
+      "warning": "#fbbf24",
+      "danger": "#f87171",
+      "display-bg": "#050a14",
+      "display-on": "#ffb454",
+      "display-off": "#233047",
+      "display-bar": "#38bdf8"
+    }
+  }
+}

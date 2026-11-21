@@ -1,0 +1,136 @@
+//! The live overview: telemetry, cooler display preview and daemon controls.
+
+use nsh_base::theme;
+use nsh_core::prelude::*;
+
+use super::{AppState, header, rescan};
+use crate::ui::{self, Tone};
+
+pub fn screen(state: AppState) -> impl IntoElement {
+    view()
+        .flex_col()
+        .gap_4()
+        .max_w(px(1040.0))
+        .child(header(
+            "Overview",
+            "Live CPU telemetry and the frame sent to the cooler display.",
+        ))
+        .child(
+            view()
+                .flex_row()
+                .flex_wrap()
+                .gap_2()
+                .child(
+                    ui::pill(
+                        move || {
+                            if state.running.get() {
+                                "Streaming".to_owned()
+                            } else {
+                                "Paused".to_owned()
+                            }
+                        },
+                        if state.running.get() {
+                            Tone::Success
+                        } else {
+                            Tone::Neutral
+                        },
+                    ),
+                )
+                .child(ui::pill(
+                    move || state.backend.get().to_owned(),
+                    Tone::Neutral,
+                ))
+                .child(ui::pill(
+                    move || format!("{} ms", state.settings.get().interval_ms),
+                    Tone::Neutral,
+                )),
+        )
+        .child(error_banner(state))
+        .child(
+            view()
+                .flex_row()
+                .gap_4()
+                .style_when(|| window().width.0 < 900.0, |style| style.flex_col())
+                .child(
+                    ui::card(
+                        "Cooler display preview",
+                        ui::segment_display(
+                            move || state.telemetry.get().temperature_c,
+                            move || state.power_bar_pct(),
+                        ),
+                    ),
+                )
+                .child(
+                    view()
+                        .flex_1()
+                        .grid()
+                        .grid_cols(2)
+                        .gap_3()
+                        .child(ui::metric(
+                            "Temperature",
+                            move || format!("{:.1}", state.telemetry.get().temperature_c),
+                            "C",
+                            true,
+                        ))
+                        .child(ui::metric(
+                            "Package power",
+                            move || state.telemetry.get().power_w.to_string(),
+                            "W",
+                            false,
+                        ))
+                        .child(ui::metric(
+                            "CPU load",
+                            move || state.telemetry.get().usage_pct.to_string(),
+                            "%",
+                            false,
+                        ))
+                        .child(ui::metric(
+                            "Core clock",
+                            move || state.telemetry.get().frequency_mhz.to_string(),
+                            "MHz",
+                            false,
+                        )),
+                ),
+        )
+        .child(
+            view()
+                .flex_row()
+                .flex_wrap()
+                .gap_2()
+                .child(
+                    ui::action(
+                        move || {
+                            if state.running.get() {
+                                "Pause".to_owned()
+                            } else {
+                                "Resume".to_owned()
+                            }
+                        },
+                        true,
+                        move || state.running.update(|running| *running = !*running),
+                    ),
+                )
+                .child(ui::action(
+                    || "Rescan devices".to_owned(),
+                    false,
+                    move || rescan(state),
+                )),
+        )
+}
+
+fn error_banner(state: AppState) -> impl IntoElement {
+    when(
+        move || state.error.get().is_some(),
+        move || {
+            view()
+                .p_3()
+                .rounded(px(10.0))
+                .bg(move || theme().destructive.opacity(0.12))
+                .child(
+                    text(move || state.error.get().unwrap_or_default())
+                        .text_size(px(12.0))
+                        .text_color(move || theme().destructive),
+                )
+        },
+    )
+}

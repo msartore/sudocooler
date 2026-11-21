@@ -1,0 +1,14 @@
+# Rust / NSH build output
+/target/
+/.nsh/
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+
+# Local secrets / overrides
+.env
+*.local.toml

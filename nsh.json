@@ -1,0 +1,14 @@
+{
+  "name": "Sudokooler",
+  "id": "io.sudokooler.companion",
+  "version": "0.1.0",
+  "build": 1,
+  "rust": ".",
+  "root": "App",
+  "theme": "theme.json",
+  "window": {
+    "title": "Sudokooler — Cooler Companion",
+    "defaultSize": { "width": 1120, "height": 760 },
+    "minSize": { "width": 640, "height": 480 }
+  }
+}
