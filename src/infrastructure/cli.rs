@@ -36,6 +36,18 @@ impl CliDaemon {
                 return Ok(path);
             }
         }
+        // Installed / portable builds keep the daemon beside the app, not in
+        // the process working directory (a shortcut starts in System32).
+        if let Ok(exe) = std::env::current_exe()
+            && let Some(dir) = exe.parent()
+        {
+            for name in ["sudokooler.exe", "sudokooler", "nsh/sudokooler.exe"] {
+                let path = dir.join(name);
+                if path.is_file() {
+                    return Ok(path);
+                }
+            }
+        }
         let candidates = [
             "sudokooler/target/release/sudokooler.exe",
             "sudokooler/target/debug/sudokooler.exe",

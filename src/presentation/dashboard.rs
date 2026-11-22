@@ -16,6 +16,7 @@ pub fn screen(state: AppState) -> impl IntoElement {
             "Live CPU telemetry and the frame sent to the cooler display.",
         ))
         .child(error_banner(state))
+        .child(sensor_notice(state))
         .child(unsupported_notice(state))
         .child(
             view()
@@ -98,6 +99,27 @@ pub fn screen(state: AppState) -> impl IntoElement {
                     move || rescan(state),
                 )),
         )
+}
+
+/// PawnIO needs elevation; without it the daemon reports zero temperature/power.
+fn sensor_notice(state: AppState) -> impl IntoElement {
+    when(
+        move || {
+            let sample = state.telemetry.get();
+            sample.temperature_c == 0.0 && sample.power_w == 0
+        },
+        move || {
+            view()
+                .p_3()
+                .rounded(px(10.0))
+                .bg(move || theme().color("warning").unwrap_or(theme().destructive).opacity(0.14))
+                .child(
+                    text("CPU temperature and power are unavailable. Run sudocooler as administrator (PawnIO) or start HWiNFO64 with shared memory enabled.")
+                        .text_size(px(12.0))
+                        .text_color(move || theme().foreground),
+                )
+        },
+    )
 }
 
 /// Shown when a detected device is outside the daemon's verified profile set.
