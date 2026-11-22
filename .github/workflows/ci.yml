@@ -59,6 +59,8 @@ jobs:
 
       - name: Build portable release and setup
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\build-release.ps1
 
       - name: Upload setup executable
