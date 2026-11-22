@@ -138,7 +138,12 @@ jobs:
       - name: Write update manifest for Windows and Linux
         shell: pwsh
         run: |
-          nsh update-manifest dist\sudocooler-*-windows-x86_64.zip dist\sudocooler-*-linux-x86_64.tar.gz --entry . --base-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" -o dist
+          # PowerShell passes wildcards literally to native commands, so expand them here.
+          $archives = @(
+            Get-ChildItem -LiteralPath dist -Filter 'sudocooler-*-windows-x86_64.zip' -ErrorAction SilentlyContinue
+            Get-ChildItem -LiteralPath dist -Filter 'sudocooler-*-linux-x86_64.tar.gz' -ErrorAction SilentlyContinue
+          ) | ForEach-Object { $_.FullName }
+          nsh update-manifest @archives --entry . --base-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" -o dist
 
       - name: Name artifacts and write checksums
         shell: pwsh
