@@ -101,7 +101,7 @@ pub fn screen(state: AppState) -> impl IntoElement {
         )
 }
 
-/// PawnIO needs elevation; without it the daemon reports zero temperature/power.
+/// The daemon's own explanation for zero temperature/power readings.
 fn sensor_notice(state: AppState) -> impl IntoElement {
     when(
         move || {
@@ -112,11 +112,21 @@ fn sensor_notice(state: AppState) -> impl IntoElement {
             view()
                 .p_3()
                 .rounded(px(10.0))
-                .bg(move || theme().color("warning").unwrap_or(theme().destructive).opacity(0.14))
+                .bg(move || {
+                    theme()
+                        .color("warning")
+                        .unwrap_or(theme().destructive)
+                        .opacity(0.14)
+                })
                 .child(
-                    text("CPU temperature and power are unavailable. Run sudocooler as administrator (PawnIO) or start HWiNFO64 with shared memory enabled.")
-                        .text_size(px(12.0))
-                        .text_color(move || theme().foreground),
+                    text(move || {
+                        state.sensor_notice.get().unwrap_or_else(|| {
+                            "CPU temperature and power are unavailable; the daemon did not report a reason."
+                                .to_owned()
+                        })
+                    })
+                    .text_size(px(12.0))
+                    .text_color(move || theme().foreground),
                 )
         },
     )

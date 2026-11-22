@@ -4,6 +4,7 @@
 //! submodule stays a standalone project with its own safety guardrails, and
 //! this UI keeps working if the daemon is built elsewhere.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -20,11 +21,21 @@ use crate::domain::telemetry::Telemetry;
 /// Runs the daemon's one-shot commands with an optional registry override.
 pub struct CliDaemon {
     config_path: Option<String>,
+    /// Sensor warning captured from the last dry-run's stderr (if any).
+    notice: RefCell<Option<String>>,
 }
 
 impl CliDaemon {
     pub fn new(config_path: Option<String>) -> Self {
-        Self { config_path }
+        Self {
+            config_path,
+            notice: RefCell::new(None),
+        }
+    }
+
+    /// The sensor warning from the last `read()` call, if any.
+    pub fn notice(&self) -> Option<String> {
+        self.notice.borrow().clone()
     }
 
     /// Resolves the binary without ever downloading or executing anything
@@ -121,7 +132,19 @@ impl CliDaemon {
             };
             return Err(AppError::new(ErrorKind::Unavailable, message));
         }
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+        // Keep the daemon's stderr warnings (e.g. why sensors are unavailable)
+        // alongside stdout so the UI can surface the real cause.
+        let mut combined = String::from_utf8_lossy(&output.stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let notice = stderr
+            .lines()
+            .find(|line| line.contains("[sensors]"))
+            .map(str::to_owned);
+        *self.notice.borrow_mut() = notice;
+        if !stderr.trim().is_empty() {
+            combined.push_str(&stderr);
+        }
+        Ok(combined)
     }
 
     fn telemetry_line(&self) -> Result<String, AppError> {

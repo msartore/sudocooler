@@ -228,14 +228,13 @@ try {
     Copy-Item -LiteralPath $DaemonBinary -Destination (Join-Path $stageDir $DaemonExeName) -Force
 
     # The self-update archive is the NSH app package, which does not include the
-    # daemon. Add sudokooler.exe beside sudocooler.exe inside it so an updated
+    # daemon. Stage sudokooler.exe beside sudocooler.exe inside it so an updated
     # install can still read telemetry (cli.rs looks for the daemon next to the app).
+    # The archive is written after PawnIO modules are staged below.
     if (-not [string]::IsNullOrEmpty($updateZip)) {
         $packagedAppDir = Join-Path $packageOut 'sudocooler'
         $packagedDaemon = Join-Path $packagedAppDir $DaemonExeName
         Copy-Item -LiteralPath $DaemonBinary -Destination $packagedDaemon -Force
-        Compress-Archive -LiteralPath $packagedAppDir -DestinationPath $updateZip -Force
-        Write-Detail "Update archive (with daemon): $updateZip"
     }
 
     # -----------------------------------------------------------------------
@@ -275,6 +274,36 @@ try {
             Copy-Item -LiteralPath $found.FullName -Destination (Join-Path $pawnioDir $moduleName) -Force
             Write-Detail "$moduleName ($($modulesAsset.Tag))"
         }
+
+        # The daemon loads its module from <exe_dir>\pawnio\. Copy the modules
+        # beside the locally-built daemon too, so running the built daemon
+        # directly (elevated) reads real telemetry instead of reporting 0.
+        $builtDaemonDir = Split-Path -Parent $DaemonBinary
+        $builtDaemonPawnio = Join-Path $builtDaemonDir 'pawnio'
+        New-Item -ItemType Directory -Path $builtDaemonPawnio -Force | Out-Null
+        foreach ($moduleName in @('AMDFamily17.bin', 'IntelMSR.bin')) {
+            $src = Join-Path $pawnioDir $moduleName
+            if (Test-Path -LiteralPath $src) {
+                Copy-Item -LiteralPath $src -Destination (Join-Path $builtDaemonPawnio $moduleName) -Force
+            }
+        }
+    }
+
+    # Write the self-update archive now that the daemon and its PawnIO modules
+    # are staged in the app package dir. The daemon loads its module from
+    # <exe_dir>\pawnio\, so it must be inside this archive.
+    if (-not [string]::IsNullOrEmpty($updateZip)) {
+        $packagedAppDir = Join-Path $packageOut 'sudocooler'
+        $packagedPawnio = Join-Path $packagedAppDir 'pawnio'
+        New-Item -ItemType Directory -Path $packagedPawnio -Force | Out-Null
+        foreach ($moduleName in @('AMDFamily17.bin', 'IntelMSR.bin')) {
+            $src = Join-Path $pawnioDir $moduleName
+            if (Test-Path -LiteralPath $src) {
+                Copy-Item -LiteralPath $src -Destination (Join-Path $packagedPawnio $moduleName) -Force
+            }
+        }
+        Compress-Archive -LiteralPath $packagedAppDir -DestinationPath $updateZip -Force
+        Write-Detail "Update archive (with daemon + PawnIO modules): $updateZip"
     }
 
     # -----------------------------------------------------------------------

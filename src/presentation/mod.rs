@@ -34,6 +34,8 @@ pub struct AppState {
     pub error: Signal<Option<String>>,
     /// Status of the last update check or install.
     pub update_status: Signal<String>,
+    /// The daemon's own reason for missing telemetry, when readings are zero.
+    pub sensor_notice: Signal<Option<String>>,
     /// Whether the app is registered to start at logon. A signal so the
     /// toggle repaints immediately after a change.
     pub autostart: Signal<bool>,
@@ -62,6 +64,7 @@ pub fn app() -> impl IntoElement {
         backend: signal("sudocooler CLI"),
         error: signal(None),
         update_status: signal("Not checked".to_owned()),
+        sensor_notice: signal(None),
         autostart: signal(composition::autostart_enabled()),
         tick: signal(0_u64),
     };
@@ -126,6 +129,7 @@ pub fn app() -> impl IntoElement {
                 batch(|| {
                     state.telemetry.set(result.telemetry);
                     state.backend.set(result.backend);
+                    state.sensor_notice.set(result.notice);
                     state.error.set(None);
                     state.packets.update(|log| {
                         let sequence = log.latest().map_or(1, |entry| entry.sequence + 1);

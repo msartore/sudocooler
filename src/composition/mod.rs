@@ -36,6 +36,8 @@ pub fn discover() -> Vec<Device> {
 pub struct Sample {
     pub telemetry: Telemetry,
     pub backend: &'static str,
+    /// The daemon's own warning about unavailable sensors, if any.
+    pub notice: Option<String>,
 }
 
 /// Writes one L120 frame to the ENERGLO 360. Called every polling tick.
@@ -79,5 +81,6 @@ pub fn sample(config_path: Option<&str>) -> Result<Sample, AppError> {
     Ok(Sample {
         telemetry,
         backend: source.backend_name(),
+        notice: source.notice(),
     })
 }
