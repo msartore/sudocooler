@@ -124,6 +124,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # nsh update-manifest validates archive names against nsh.json's version,
+      # so the publish checkout must be stamped too (the archives carry the tag).
+      - name: Set version from tag
+        shell: pwsh
+        run: ./scripts/set-version.ps1 -Version "${{ github.ref_name }}"
+
       - name: Install NSH 0.5
         shell: pwsh
         run: |
