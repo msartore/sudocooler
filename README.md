@@ -1,5 +1,7 @@
 # sudocooler
 
+[![CI](https://github.com/msartore/sudocooler/actions/workflows/ci.yml/badge.svg)](https://github.com/msartore/sudocooler/actions/workflows/ci.yml)
+
 `sudocooler` is a native desktop app for Sudokoo CPU coolers. It shows live CPU
 telemetry, streams frames to the cooler's display, and keeps the connection
 available from the system tray. It is written in Rust with

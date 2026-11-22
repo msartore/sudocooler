@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: build and publish portable release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout (with daemon submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            sudokooler -> sudokooler/target
+
+      - name: Install NSH 0.5
+        shell: pwsh
+        run: |
+          $env:NSH_VERSION = '0.5.0'
+          irm https://nsh.dev/install.ps1 | iex
+          "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build portable release
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\build-release.ps1
+
+      - name: Name artifact and write checksum
+        shell: pwsh
+        run: |
+          $zip = "sudocooler-$env:GITHUB_REF_NAME-portable.zip"
+          Move-Item -LiteralPath dist\sudocooler-portable.zip -Destination "dist\$zip"
+          $hash = (Get-FileHash -LiteralPath "dist\$zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $zip" | Out-File -FilePath dist\SHA256SUMS.txt -Encoding ascii
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/sudocooler-*-portable.zip
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
