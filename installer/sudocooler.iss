@@ -46,17 +46,17 @@ Name: desktopicon; Description: "Create a desktop shortcut"; GroupDescription: "
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-; PawnIO needs elevation. The shortcuts launch through a hidden PowerShell
-; using -Verb RunAs so CPU temperature and package power stay available.
-Name: "{group}\{#AppName}"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -Command ""Start-Process -FilePath '{app}\sudocooler.exe' -Verb RunAs"""; IconFilename: "{app}\{#AppExe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -Command ""Start-Process -FilePath '{app}\sudocooler.exe' -Verb RunAs"""; IconFilename: "{app}\{#AppExe}"; Tasks: desktopicon
+; PawnIO needs elevation. Launch through a VBScript that ShellExecutes with
+; "runas": the UAC prompt appears directly and no console window flashes.
+Name: "{group}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch-elevated.vbs"""; IconFilename: "{app}\{#AppExe}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch-elevated.vbs"""; IconFilename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
 ; Elevated logon task: CPU temperature and package power need PawnIO elevation.
 Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN sudocooler /TR ""{app}\{#AppExe}"" /SC ONLOGON /RL HIGHEST /F"; Flags: runhidden; StatusMsg: "Registering elevated autostart task..."
 ; Install the signed PawnIO driver only when it is missing.
 Filename: "{app}\installer\PawnIO_setup.exe"; Parameters: "/S"; Flags: runhidden skipifdoesntexist; Check: PawnIONotInstalled; StatusMsg: "Installing PawnIO driver..."
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -Command ""Start-Process -FilePath '{app}\sudocooler.exe' -Verb RunAs"""; Description: "Launch sudocooler now"; Flags: nowait postinstall skipifsilent
+Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch-elevated.vbs"""; Description: "Launch sudocooler now"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN sudocooler /F"; Flags: runhidden; RunOnceId: RemoveSudocoolerTask

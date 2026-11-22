@@ -91,14 +91,20 @@ if [ ! -f "$package_archive" ]; then
     package_archive="$repo_root/.nsh/out/sudocooler.tar.gz"
 fi
 [ -f "$package_archive" ] || die "NSH package did not produce 'sudocooler.tar.gz'."
-cp -f "$package_archive" "$update_archive"
-detail "Update archive: $update_archive"
 
 step '[3/4] Building the daemon (sudokooler submodule, release) ...'
 (cd "$repo_root" && cargo build --release --manifest-path "$daemon_manifest")
 daemon_bin="$repo_root/sudokooler/target/release/sudokooler"
 [ -f "$daemon_bin" ] || die "Daemon binary not found at '$daemon_bin'."
 [ -x "$daemon_bin" ] || chmod +x "$daemon_bin"
+
+# The self-update archive is the NSH app package, which does not include the
+# daemon. Add `sudokooler` beside the runner inside it so an updated install
+# can still read telemetry (cli.rs looks for the daemon next to the app).
+cp -f "$daemon_bin" "$app_dir/sudokooler"
+chmod +x "$app_dir/sudokooler"
+tar -czf "$update_archive" -C "$package_out" sudocooler
+detail "Update archive (with daemon): $update_archive"
 
 step '[4/4] Staging the portable folder and creating the archive ...'
 mkdir -p "$stage_dir"

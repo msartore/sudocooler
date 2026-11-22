@@ -185,10 +185,11 @@ try {
         $AppPackageDir = Join-Path $packageOut 'sudocooler'
 
         # Keep the NSH package archive under the name nsh update-manifest needs.
+        # The daemon is added to it after it is built below (the nsh package
+        # itself only contains the app runner), so the self-updater ships the
+        # daemon too.
         $appVersion = (Get-Content -LiteralPath (Join-Path $repoRoot 'nsh.json') -Raw | ConvertFrom-Json).version
         $updateZip = Join-Path $OutDir "sudocooler-$appVersion-windows-x86_64.zip"
-        Copy-Item -LiteralPath (Join-Path $packageOut 'sudocooler.zip') -Destination $updateZip -Force
-        Write-Detail "Update archive: $updateZip"
     }
     else {
         Write-Step '[1/4] Using the supplied app package directory (skipping nsh build/package).'
@@ -225,6 +226,17 @@ try {
         throw "The daemon binary was not found at '$DaemonBinary'."
     }
     Copy-Item -LiteralPath $DaemonBinary -Destination (Join-Path $stageDir $DaemonExeName) -Force
+
+    # The self-update archive is the NSH app package, which does not include the
+    # daemon. Add sudokooler.exe beside sudocooler.exe inside it so an updated
+    # install can still read telemetry (cli.rs looks for the daemon next to the app).
+    if (-not [string]::IsNullOrEmpty($updateZip)) {
+        $packagedAppDir = Join-Path $packageOut 'sudocooler'
+        $packagedDaemon = Join-Path $packagedAppDir $DaemonExeName
+        Copy-Item -LiteralPath $DaemonBinary -Destination $packagedDaemon -Force
+        Compress-Archive -LiteralPath $packagedAppDir -DestinationPath $updateZip -Force
+        Write-Detail "Update archive (with daemon): $updateZip"
+    }
 
     # -----------------------------------------------------------------------
     # 3. PawnIO assets (build output / temp only, never committed)
@@ -269,7 +281,7 @@ try {
     # 4. Docs, helper scripts, licenses and the final zip
     # -----------------------------------------------------------------------
     Write-Step '[4/4] Staging docs and creating the portable zip ...'
-    foreach ($name in @('install.ps1', 'uninstall.ps1')) {
+    foreach ($name in @('install.ps1', 'uninstall.ps1', 'launch-elevated.vbs')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $stageDir $name) -Force
     }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination (Join-Path $stageDir 'README.md') -Force
