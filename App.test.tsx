@@ -8,9 +8,10 @@ test("sudocooler renders its dashboard", async () => {
   expect(app.texts()).toContain("CPU PACKAGE TEMPERATURE");
 });
 
-test("the device list is reachable", async () => {
+test("settings opens from the home top bar", async () => {
   const app = await open(".");
-  await app.press("Devices");
-  expect(app.texts()).toContain("USB HID interfaces");
-  expect(app.texts()).toContain("381C:0003 · sk700v · verified");
+  await app.press("Settings");
+  expect(app.texts()).toContain("Start at login");
+  expect(app.texts()).toContain("Software update");
+  expect(app.texts()).toContain("msartore.dev");
 });

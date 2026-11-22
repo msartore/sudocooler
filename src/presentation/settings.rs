@@ -3,19 +3,15 @@
 use nsh_base::theme;
 use nsh_core::prelude::*;
 
-use super::{AppState, header};
+use super::{AppState, push_log};
 use crate::composition;
 use crate::ui;
 
-pub fn screen(state: AppState) -> impl IntoElement {
+/// Settings cards, rendered inside the Tools screen.
+pub fn cards(state: AppState) -> impl IntoElement {
     view()
         .flex_col()
         .gap_4()
-        .max_w(px(820.0))
-        .child(header(
-            "Settings",
-            "Polling speed and the temperature unit sent to the cooler.",
-        ))
         .child(ui::card(
             "Daemon",
             view()
@@ -78,7 +74,14 @@ pub fn screen(state: AppState) -> impl IntoElement {
                     },
                     move || {
                         let next = !composition::autostart_enabled();
-                        let _ = composition::set_autostart(next);
+                        match composition::set_autostart(next) {
+                            Ok(()) => push_log(
+                                state,
+                                "info",
+                                format!("Autostart {}", if next { "enabled" } else { "disabled" }),
+                            ),
+                            Err(error) => push_log(state, "error", format!("Autostart: {error}")),
+                        }
                     },
                 ))
                 .child(ui::setting_row(
@@ -103,10 +106,12 @@ pub fn screen(state: AppState) -> impl IntoElement {
                     move || {
                         let status = state.update_status;
                         spawn(async move {
-                            status.set(match composition::check_update() {
+                            let message = match composition::check_update() {
                                 Ok(message) => message,
                                 Err(error) => format!("Check failed: {error}"),
-                            });
+                            };
+                            push_log(state, "info", message.clone());
+                            status.set(message);
                         });
                     },
                 ))
@@ -117,10 +122,12 @@ pub fn screen(state: AppState) -> impl IntoElement {
                     move || {
                         let status = state.update_status;
                         spawn(async move {
-                            status.set(match composition::install_update() {
+                            let message = match composition::install_update() {
                                 Ok(message) => message,
                                 Err(error) => format!("Install failed: {error}"),
-                            });
+                            };
+                            push_log(state, "info", message.clone());
+                            status.set(message);
                         });
                     },
                 )),

@@ -41,16 +41,15 @@ numeric telemetry and a seven-segment preview, not arbitrary graphics.
 - **L120 frames** — a 19-byte telemetry frame is encoded and streamed to the
   ENERGLO 360 on each tick; the display-open frame is sent once and a display-off
   frame is sent on quit.
-- **Packet inspector** — the SK700V 64-byte report and recent L120 frames as
-  contiguous hex, in a bounded log.
-- **Device list** — HID interfaces from the OS tree with enabled/verified status;
-  unverified PIDs are visible but stay read-only.
+- **One Home screen** — telemetry and the cooler display preview; nothing else
+  to click through.
+- **Home top bar** — **Settings** opens a modal with polling, temperature unit,
+  autostart, self-update and links; **Logs** opens a separate window with the
+  last 100 in-app events.
 - **System tray** — icon with Show window, Pause/Resume and Quit. Closing the
   window hides the app into the tray instead of exiting; opening it again brings
   the existing instance forward (single instance). Quitting from the tray closes
   the cooler display cleanly.
-- **Settings** — polling interval, temperature unit sent to the cooler, Windows
-  logon autostart, and links to the app, daemon and website.
 - **Sensor source** — see [Temperature and power](#temperature-and-power) below.
 
 ## Temperature and power

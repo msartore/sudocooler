@@ -2,15 +2,16 @@
 //! `ScreenState`s; no process, platform or transport code lives here.
 
 pub mod dashboard;
-pub mod devices;
-pub mod packets;
+pub mod logs;
 pub mod settings;
 
 use std::time::Duration;
 
 use nsh_base::theme;
 use nsh_core::desktop::WindowAttributes;
-use nsh_core::element::desktop::{MenuItem, current_window, set_tray, tray};
+use nsh_core::element::desktop::{
+    MenuItem, current_window, open_window, set_tray, tray, window as new_window,
+};
 use nsh_core::prelude::*;
 
 use crate::application::use_cases::{PacketEntry, PacketLog};
@@ -18,6 +19,8 @@ use crate::composition::{self, AppDeps};
 use crate::domain::device::Device;
 use crate::domain::settings::Settings;
 use crate::domain::telemetry::Telemetry;
+use crate::presentation::logs::LogEntry;
+use crate::ui;
 
 /// Profile default from `profiles/default_devices.toml`.
 const POWER_BAR_MAX_W: u16 = 160;
@@ -25,10 +28,7 @@ const POWER_BAR_MAX_W: u16 = 160;
 /// The section shown in the content column.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
-    Dashboard,
-    Devices,
-    Packets,
-    Settings,
+    Home,
 }
 
 /// All state the screens share. Signals are `Copy` handles, so screens get a
@@ -44,6 +44,8 @@ pub struct AppState {
     pub error: Signal<Option<String>>,
     /// Status of the last update check or install.
     pub update_status: Signal<String>,
+    /// Recent in-app events, shown under Tools → Logs.
+    pub logs: Signal<Vec<LogEntry>>,
     /// Heartbeat counter, used to pace sampling at the configured interval.
     pub tick: Signal<u64>,
 }
@@ -52,6 +54,33 @@ impl AppState {
     pub fn power_bar_pct(&self) -> u8 {
         self.telemetry.get().power_bar_pct(POWER_BAR_MAX_W)
     }
+}
+
+/// Appends an event to the in-app log (most recent last, capped at 100).
+pub fn push_log(state: AppState, level: &'static str, message: impl Into<String>) {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        % 86_400;
+    let time = format!(
+        "{:02}:{:02}:{:02}",
+        seconds / 3600,
+        (seconds / 60) % 60,
+        seconds % 60
+    );
+    state.logs.update(|entries| {
+        let sequence = entries.last().map_or(1, |entry| entry.sequence + 1);
+        entries.push(LogEntry {
+            sequence,
+            time,
+            level,
+            message: message.into(),
+        });
+        if entries.len() > 100 {
+            entries.remove(0);
+        }
+    });
 }
 
 /// Root mounted by `nsh.json` and `cargo run`.
@@ -66,10 +95,12 @@ pub fn app() -> impl IntoElement {
         backend: signal("sudocooler CLI"),
         error: signal(None),
         update_status: signal("Not checked".to_owned()),
+        logs: signal(Vec::new()),
         tick: signal(0_u64),
     };
 
     provide_context(AppDeps::new());
+    push_log(state, "info", "sudocooler started");
 
     // Closing the window hides it into the tray; the Quit tray item exits.
     // Set the attribute in code as well as nsh.json: direct cargo runs do not
@@ -153,10 +184,14 @@ pub fn app() -> impl IntoElement {
                     && let Err(error) =
                         composition::write_l120(&result.telemetry, settings.temp_unit)
                 {
+                    push_log(state, "error", format!("L120 write failed: {error}"));
                     state.error.set(Some(format!("L120 write: {error}")));
                 }
             }
-            Err(error) => state.error.set(Some(error.message)),
+            Err(error) => {
+                push_log(state, "error", error.message.clone());
+                state.error.set(Some(error.message));
+            }
         }
     });
 
@@ -170,51 +205,111 @@ pub fn app() -> impl IntoElement {
 
 /// Rescan devices in the active adapter and publish the result.
 pub fn rescan(state: AppState) {
-    state.devices.set(composition::discover());
+    let devices = composition::discover();
+    let connected = devices.iter().filter(|device| device.connected).count();
+    push_log(
+        state,
+        "info",
+        format!("USB scan complete: {connected} cooler(s) detected"),
+    );
+    state.devices.set(devices);
     state.error.set(None);
 }
 
 fn shell(state: AppState) -> impl IntoElement {
-    let tab = signal(Tab::Dashboard);
+    let settings_open = signal(false);
     view()
         .flex_1()
         .flex_row()
         .style_when(|| window().width.0 < 700.0, |style| style.flex_col())
-        .child(sidebar(state, tab))
+        .child(sidebar(state))
+        .child(view().flex_1().child(top_bar(state, settings_open)))
         .child(
-            scroll().flex_1().p(px(24.0)).child(
-                when(
-                    move || tab.get() == Tab::Dashboard,
-                    move || dashboard::screen(state),
-                )
-                .otherwise(move || {
-                    when(
-                        move || tab.get() == Tab::Devices,
-                        move || devices::screen(state),
-                    )
-                    .otherwise(move || {
-                        when(
-                            move || tab.get() == Tab::Packets,
-                            move || packets::screen(state),
+            scroll()
+                .flex_1()
+                .p(px(24.0))
+                .child(dashboard::screen(state)),
+        )
+        .child(when(
+            move || settings_open.get(),
+            move || settings_modal(state, settings_open),
+        ))
+}
+
+/// The Home top bar: settings opens a modal, logs opens its own window.
+fn top_bar(state: AppState, settings_open: Signal<bool>) -> impl IntoElement {
+    view()
+        .flex_row()
+        .items_center()
+        .justify_end()
+        .gap_2()
+        .px_4()
+        .pt_3()
+        .child(ui::action_with_icon(
+            asset!("icons/settings.svg"),
+            || "Settings".to_owned(),
+            false,
+            move || settings_open.set(true),
+        ))
+        .child(ui::action_with_icon(
+            asset!("icons/activity.svg"),
+            || "Logs".to_owned(),
+            false,
+            move || open_logs_window(state),
+        ))
+}
+
+fn open_logs_window(state: AppState) {
+    open_window(
+        new_window()
+            .id("logs")
+            .title("sudocooler — Logs")
+            .default_size(size(px(720.0), px(520.0)))
+            .content(move || logs::screen(state)),
+    );
+}
+
+/// A modal settings panel over the Home screen.
+fn settings_modal(state: AppState, open: Signal<bool>) -> impl IntoElement {
+    view()
+        .absolute()
+        .inset_0()
+        .z_index(20)
+        .bg(rgba(0x00000099))
+        .items_center()
+        .justify_center()
+        .child(
+            view()
+                .w(px(760.0))
+                .max_h(px(680.0))
+                .flex_col()
+                .gap_3()
+                .p(px(20.0))
+                .rounded(px(14.0))
+                .bg(move || theme().card)
+                .child(
+                    view()
+                        .flex_row()
+                        .items_center()
+                        .child(
+                            text("Settings")
+                                .text_size(px(18.0))
+                                .font_weight(FontWeight::BOLD)
+                                .flex_1(),
                         )
-                        .otherwise(move || settings::screen(state))
-                    })
-                }),
-            ),
+                        .child(
+                            text("Close")
+                                .text_size(px(13.0))
+                                .text_color(move || theme().primary)
+                                .on_press(move || open.set(false)),
+                        ),
+                )
+                .child(scroll().flex_1().child(settings::cards(state))),
         )
 }
 
-fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
-    let items = [
-        (
-            Tab::Dashboard,
-            "Overview",
-            asset!("icons/layout-dashboard.svg"),
-        ),
-        (Tab::Devices, "Devices", asset!("icons/cpu.svg")),
-        (Tab::Packets, "Packets", asset!("icons/package.svg")),
-        (Tab::Settings, "Settings", asset!("icons/settings.svg")),
-    ];
+fn sidebar(state: AppState) -> impl IntoElement {
+    let items = [(Tab::Home, "Home", asset!("icons/layout-dashboard.svg"))];
 
     let mut nav = view().flex_col().gap_1().child(
         view()
@@ -241,7 +336,7 @@ fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
             ),
     );
 
-    for (value, label, icon) in items {
+    for (_, label, icon) in items {
         nav = nav.child(
             view()
                 .flex_row()
@@ -250,32 +345,17 @@ fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
                 .px_3()
                 .py(px(10.0))
                 .rounded(px(9.0))
-                .bg(move || {
-                    if tab.get() == value {
-                        theme().sidebar_accent
-                    } else {
-                        theme().sidebar
-                    }
-                })
-                .on_press(move || tab.set(value))
-                .child(image(icon).size(px(17.0)).tint_color(move || {
-                    if tab.get() == value {
-                        theme().sidebar_foreground
-                    } else {
-                        theme().muted_foreground
-                    }
-                }))
+                .bg(move || theme().sidebar_accent)
+                .child(
+                    image(icon)
+                        .size(px(17.0))
+                        .tint_color(move || theme().sidebar_foreground),
+                )
                 .child(
                     text(label)
                         .text_size(px(13.0))
                         .font_weight(FontWeight::MEDIUM)
-                        .text_color(move || {
-                            if tab.get() == value {
-                                theme().sidebar_foreground
-                            } else {
-                                theme().muted_foreground
-                            }
-                        }),
+                        .text_color(move || theme().sidebar_foreground),
                 ),
         );
     }
