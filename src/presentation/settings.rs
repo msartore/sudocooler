@@ -1,14 +1,13 @@
-//! Settings screen: polling, data source, units and registry override.
+//! Settings screen: only the controls that affect live behaviour.
 
 use nsh_base::theme;
 use nsh_core::prelude::*;
 
-use super::{AppState, header, rescan};
-use crate::composition::AppDeps;
+use super::{AppState, header};
+use crate::composition;
 use crate::ui;
 
 pub fn screen(state: AppState) -> impl IntoElement {
-    let deps = use_context::<AppDeps>().expect("the app provides its dependencies");
 
     view()
         .flex_col()
@@ -16,7 +15,7 @@ pub fn screen(state: AppState) -> impl IntoElement {
         .max_w(px(820.0))
         .child(header(
             "Settings",
-            "Tune polling and choose between simulated data and the real daemon.",
+            "Polling speed and the temperature unit sent to the cooler.",
         ))
         .child(
             ui::card(
@@ -70,16 +69,18 @@ pub fn screen(state: AppState) -> impl IntoElement {
                             )),
                     )
                     .child(ui::setting_row(
-                        "Data source",
-                        "Demo works without an attached cooler",
-                        move || if state.demo.get() { "Demo" } else { "Daemon" }.to_owned(),
+                        "Start at login",
+                        "Windows logon autostart",
                         move || {
-                            let next = !state.demo.get();
-                            deps.demo.set(next);
-                            state.settings.update(|settings| {
-                                *settings = settings.clone().with_demo(next)
-                            });
-                            rescan(state);
+                            if composition::autostart_enabled() {
+                                "On".to_owned()
+                            } else {
+                                "Off".to_owned()
+                            }
+                        },
+                        move || {
+                            let next = !composition::autostart_enabled();
+                            let _ = composition::set_autostart(next);
                         },
                     ))
                     .child(ui::setting_row(
@@ -97,26 +98,6 @@ pub fn screen(state: AppState) -> impl IntoElement {
                             });
                         },
                     ))
-                    .child(ui::setting_row(
-                        "Device registry",
-                        "Override with the daemon's --config path",
-                        move || {
-                            state
-                                .settings
-                                .get()
-                                .config_path
-                                .clone()
-                                .unwrap_or_else(|| "built-in".to_owned())
-                        },
-                        move || {
-                            // Clear any override and fall back to the embedded
-                            // profiles shipped in the submodule.
-                            state.settings.update(|settings| {
-                                *settings = settings.clone().with_config_path(None)
-                            });
-                            rescan(state);
-                        },
-                    )),
             ),
         )
         .child(
@@ -125,7 +106,7 @@ pub fn screen(state: AppState) -> impl IntoElement {
                 view()
                     .gap_1()
                     .child(
-                        text("SK700V · 64-byte HID reports · VID 0x381C")
+                        text("Live daemon telemetry · ENERGLO 360 L120 frames stream automatically")
                             .text_size(px(12.0))
                             .font_weight(FontWeight::MEDIUM),
                     )

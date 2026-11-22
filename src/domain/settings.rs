@@ -14,7 +14,6 @@ pub const DEFAULT_INTERVAL_MS: u32 = 1000;
 pub struct Settings {
     pub interval_ms: u32,
     pub config_path: Option<String>,
-    pub demo_mode: bool,
     pub temp_unit: TempUnit,
 }
 
@@ -23,7 +22,6 @@ impl Default for Settings {
         Self {
             interval_ms: DEFAULT_INTERVAL_MS,
             config_path: None,
-            demo_mode: true,
             temp_unit: TempUnit::Celsius,
         }
     }
@@ -52,11 +50,6 @@ impl Settings {
 
     pub fn with_config_path(mut self, path: Option<String>) -> Self {
         self.config_path = path.filter(|p| !p.trim().is_empty());
-        self
-    }
-
-    pub fn with_demo(mut self, demo: bool) -> Self {
-        self.demo_mode = demo;
         self
     }
 

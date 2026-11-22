@@ -38,6 +38,7 @@ pub fn screen(state: AppState) -> impl IntoElement {
         )
 }
 
+
 fn device_row(device: ReadSignal<Device>) -> impl IntoElement {
     let tone = if device.get().is_writable() {
         Tone::Success

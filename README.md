@@ -1,11 +1,12 @@
-# Sudokooler Companion
+# sudocooler
 
-A native UI for the [`sudokooler`](https://github.com/BGW-10/sudokooler) daemon,
-written in Rust with [Native Shell](https://nsh.dev) (NSH 0.5). It runs on
+`sudocooler` is a native app for Sudokoo CPU coolers, written in Rust with
+[Native Shell](https://nsh.dev) (NSH 0.5). It reads live telemetry and drives
+the ENERGLO 360 display. It runs on
 Windows, Linux and macOS from one Rust crate, with no JavaScript VM.
 
 The daemon itself is a **git submodule** at `sudokooler/`. This repository only
-contains the companion app; the daemon keeps its own build, tests and hardware
+contains this app; the daemon keeps its own build, tests and hardware
 safety rules.
 
 ## Layout

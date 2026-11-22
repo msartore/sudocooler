@@ -1,7 +1,7 @@
 // Headless smoke test of the Rust root: `nsh test`.
 import { expect, open, test } from "nsh/test";
 
-test("the companion renders its dashboard", async () => {
+test("sudocooler renders its dashboard", async () => {
   const app = await open(".");
   expect(app.texts()).toContain("SUDOKOOLER");
   expect(app.texts()).toContain("Overview");

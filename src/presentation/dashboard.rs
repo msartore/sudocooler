@@ -46,6 +46,7 @@ pub fn screen(state: AppState) -> impl IntoElement {
                 )),
         )
         .child(error_banner(state))
+        .child(unsupported_notice(state))
         .child(
             view()
                 .flex_row()
@@ -116,6 +117,24 @@ pub fn screen(state: AppState) -> impl IntoElement {
                     move || rescan(state),
                 )),
         )
+}
+
+/// Shown when a detected device is outside the daemon's verified profile set.
+fn unsupported_notice(state: AppState) -> impl IntoElement {
+    when(
+        move || state.devices.get().iter().any(|device| device.connected && !device.enabled),
+        move || {
+            view()
+                .p_3()
+                .rounded(px(10.0))
+                .bg(move || theme().muted.opacity(0.45))
+                .child(
+                    text("ENERGLO 360 detected (PID 381C:0005). The seven-segment preview emulates SK700V; live L120 frames are streamed to your cooler automatically.")
+                        .text_size(px(12.0))
+                        .text_color(move || theme().foreground),
+                )
+        },
+    )
 }
 
 fn error_banner(state: AppState) -> impl IntoElement {

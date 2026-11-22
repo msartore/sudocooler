@@ -7,6 +7,11 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 use crate::application::ports::{DeviceSource, TelemetrySource};
 use crate::application::{AppError, ErrorKind};
 use crate::domain::device::{Device, default_profiles};
@@ -55,6 +60,8 @@ impl CliDaemon {
     fn invoke(&self, args: &[&str]) -> Result<String, AppError> {
         let binary = self.binary()?;
         let mut command = Command::new(binary);
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
         command.args(args);
         if let Some(config) = &self.config_path {
             command.args(["--config", config]);

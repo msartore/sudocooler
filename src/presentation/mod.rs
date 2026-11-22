@@ -9,6 +9,7 @@ pub mod settings;
 use std::time::Duration;
 
 use nsh_base::theme;
+use nsh_core::element::desktop::{MenuItem, current_window, set_tray, tray};
 use nsh_core::prelude::*;
 
 use crate::application::use_cases::{PacketEntry, PacketLog};
@@ -37,7 +38,6 @@ pub struct AppState {
     pub devices: Signal<Vec<Device>>,
     pub packets: Signal<PacketLog>,
     pub running: Signal<bool>,
-    pub demo: Signal<bool>,
     pub settings: Signal<Settings>,
     pub backend: Signal<&'static str>,
     pub error: Signal<Option<String>>,
@@ -56,17 +56,38 @@ pub fn app() -> impl IntoElement {
     let initial = Telemetry::new(47.0, 16, 40, 5025).expect("valid initial sample");
     let state = AppState {
         telemetry: signal(initial),
-        devices: signal(composition::discover(true, None)),
+        devices: signal(composition::discover()),
         packets: signal(PacketLog::default()),
         running: signal(true),
-        demo: signal(true),
         settings: signal(Settings::default()),
-        backend: signal("demo"),
+        backend: signal("sudokooler CLI"),
         error: signal(None),
         tick: signal(0_u64),
     };
 
-    provide_context(AppDeps::new(state.demo));
+    provide_context(AppDeps::new());
+
+    // System tray: always available, with a live pause/resume action.
+    let tray_running = state.running;
+    effect(move || {
+        let running = tray_running.get();
+        set_tray(
+            tray()
+                .icon(crate::LOGO)
+                .tooltip("sudocooler")
+                .menu([
+                    MenuItem::new("Show window").on_select(move || current_window().show()),
+                    MenuItem::new(if running { "Pause" } else { "Resume" }).on_select(move || {
+                        tray_running.update(|value| *value = !*value)
+                    }),
+                    MenuItem::new("Quit").on_select(move || {
+                        composition::close_l120();
+                        std::process::exit(0);
+                    }),
+                ])
+                .on_click(move |_| current_window().show()),
+        );
+    });
 
     // A 100 ms heartbeat; sampling happens only when the configured interval
     // has elapsed. Tasks and timers end with the view that created them.
@@ -81,7 +102,7 @@ pub fn app() -> impl IntoElement {
         if tick % period != 0 {
             return;
         }
-        match composition::sample(state.demo.get(), settings.config_path.as_deref()) {
+        match composition::sample(settings.config_path.as_deref()) {
             Ok(result) => {
                 batch(|| {
                     state.telemetry.set(result.telemetry);
@@ -89,14 +110,38 @@ pub fn app() -> impl IntoElement {
                     state.error.set(None);
                     state.packets.update(|log| {
                         let sequence = log.latest().map_or(1, |entry| entry.sequence + 1);
-                        log.push(PacketEntry::from_sample(
-                            sequence,
-                            &result.telemetry,
-                            &settings,
-                            POWER_BAR_MAX_W,
-                        ));
+                        let is_l120 = state
+                            .devices
+                            .get()
+                            .iter()
+                            .any(|device| device.pid == 0x0005 && device.connected);
+                        log.push(if is_l120 {
+                            PacketEntry::from_l120_sample(
+                                sequence,
+                                &result.telemetry,
+                                settings.temp_unit,
+                            )
+                        } else {
+                            PacketEntry::from_sample(
+                                sequence,
+                                &result.telemetry,
+                                &settings,
+                                POWER_BAR_MAX_W,
+                            )
+                        });
                     });
                 });
+
+                if state
+                    .devices
+                    .get()
+                    .iter()
+                    .any(|device| device.pid == 0x0005 && device.connected)
+                    && let Err(error) =
+                        composition::write_l120(&result.telemetry, settings.temp_unit)
+                {
+                    state.error.set(Some(format!("L120 write: {error}")));
+                }
             }
             Err(error) => state.error.set(Some(error.message)),
         }
@@ -112,11 +157,7 @@ pub fn app() -> impl IntoElement {
 
 /// Rescan devices in the active adapter and publish the result.
 pub fn rescan(state: AppState) {
-    let settings = state.settings.get();
-    state.devices.set(composition::discover(
-        state.demo.get(),
-        settings.config_path.as_deref(),
-    ));
+    state.devices.set(composition::discover());
     state.error.set(None);
 }
 
@@ -163,18 +204,26 @@ fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
         .gap_1()
         .child(
             view()
+                .flex_row()
+                .items_center()
+                .gap_2()
                 .px_3()
                 .pb_5()
+                .child(image(crate::LOGO).size(px(34.0)))
                 .child(
-                    text("SUDOKOOLER")
-                        .text_size(px(15.0))
-                        .font_weight(FontWeight::BOLD)
-                        .text_color(move || theme().foreground),
-                )
-                .child(
-                    text("cooler companion")
-                        .text_size(px(11.0))
-                        .text_color(move || theme().muted_foreground),
+                    view()
+                        .gap_0p5()
+                        .child(
+                            text("SUDOKOOLER")
+                                .text_size(px(15.0))
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(move || theme().foreground),
+                        )
+                        .child(
+                            text("cooler companion")
+                                .text_size(px(11.0))
+                                .text_color(move || theme().muted_foreground),
+                        ),
                 ),
         );
 
@@ -219,13 +268,7 @@ fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
             view()
                 .px_3()
                 .child(
-                    text(move || {
-                        format!(
-                            "{} · {}",
-                            if state.demo.get() { "Demo" } else { "Daemon" },
-                            state.backend.get()
-                        )
-                    })
+                    text(move || state.backend.get().to_owned())
                     .text_size(px(10.0))
                     .text_color(move || theme().muted_foreground),
                 ),

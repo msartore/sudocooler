@@ -61,6 +61,53 @@ pub fn encode_packet(telemetry: &Telemetry, max_watts: u16, unit: TempUnit) -> [
     packet
 }
 
+/// Appends the L120 checksum byte and frame terminator to a payload.
+///
+/// MasterCraft's `generateCheckDigit` sums every payload byte, keeps the low
+/// byte and appends `0x16`. The host then prefixes HID report ID `0x10`.
+pub fn l120_frame(payload: &[u8]) -> Vec<u8> {
+    let checksum = payload.iter().fold(0u8, |acc, &byte| acc.wrapping_add(byte));
+    let mut frame = Vec::with_capacity(payload.len() + 3);
+    frame.push(0x10);
+    frame.extend_from_slice(payload);
+    frame.push(checksum);
+    frame.push(0x16);
+    frame
+}
+
+/// The 19-byte L120 telemetry report recovered from MasterCraft 1.0.6.
+///
+/// ```text
+/// 10 | 68 01 10 0C 01 02 | power BE u16 | unit | temp BE f32 |
+///      load u8 | clock BE u16 | checksum | 16
+/// ```
+pub fn encode_l120_packet(telemetry: &Telemetry, unit: TempUnit) -> Vec<u8> {
+    let mut payload = vec![0x68, 0x01, 0x10, 0x0C, 0x01, 0x02];
+    payload.extend_from_slice(&telemetry.power_w.min(999).to_be_bytes());
+    payload.push(match unit {
+        TempUnit::Celsius => 0x00,
+        TempUnit::Fahrenheit => 0x01,
+    });
+    let temperature = match unit {
+        TempUnit::Celsius => telemetry.temperature_c,
+        TempUnit::Fahrenheit => telemetry.temperature_c * 9.0 / 5.0 + 32.0,
+    };
+    payload.extend_from_slice(&temperature.to_be_bytes());
+    payload.push(telemetry.usage_pct);
+    payload.extend_from_slice(&telemetry.frequency_mhz.to_be_bytes());
+    l120_frame(&payload)
+}
+
+/// MasterCraft's `displayOpen` command: `68 01 10 02 01 01 00...`.
+pub fn encode_l120_display_open() -> Vec<u8> {
+    l120_frame(&[0x68, 0x01, 0x10, 0x02, 0x01, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+}
+
+/// MasterCraft's `displayClose` command: `68 01 10 0C 01 00 00...`.
+pub fn encode_l120_display_close() -> Vec<u8> {
+    l120_frame(&[0x68, 0x01, 0x10, 0x0C, 0x01, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+}
+
 /// Lowercase contiguous hex, as printed by `sudokooler --dry-run`.
 pub fn format_hex(bytes: &[u8]) -> String {
     use std::fmt::Write as _;
@@ -84,6 +131,22 @@ mod tests {
         let mut expected = captured.to_owned();
         expected.push_str(&"00".repeat(64 - captured.len() / 2));
         assert_eq!(format_hex(&frame), expected);
+    }
+
+    #[test]
+    fn l120_frame_matches_mastercraft_encoding() {
+        let telemetry = Telemetry::new(47.0, 16, 40, 5025).unwrap();
+        let frame = encode_l120_packet(&telemetry, TempUnit::Celsius);
+        // 10 | 68 01 10 0C 01 02 | 0028 | 00 | 423c0000 | 10 | 13a1 | csum | 16
+        assert_eq!(frame.len(), 19);
+        assert_eq!(&frame[..7], &[0x10, 0x68, 0x01, 0x10, 0x0C, 0x01, 0x02]);
+        assert_eq!(frame[18], 0x16);
+        assert_eq!(
+            frame[17],
+            frame[1..17].iter().fold(0u8, |a, &b| a.wrapping_add(b))
+        );
+        assert_eq!(encode_l120_display_open()[18], 0x16);
+        assert_eq!(encode_l120_display_close()[18], 0x16);
     }
 
     #[test]

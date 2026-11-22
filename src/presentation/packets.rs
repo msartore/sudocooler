@@ -96,7 +96,7 @@ fn row(entry: ReadSignal<PacketEntry>) -> impl IntoElement {
         .border_b(px(1.0))
         .border_color(move || theme().border)
         .child(
-            text(move || format!("#{:03}", entry.get().sequence))
+            text(move || format!("#{:03} {}", entry.get().sequence, entry.get().protocol))
                 .text_size(px(11.0))
                 .text_color(move || theme().muted_foreground),
         )

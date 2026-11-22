@@ -13,11 +13,16 @@ use nsh_platform_windows as platform;
 fn main() -> impl std::process::Termination {
     env_logger::init();
     platform::run_app(
-        platform::AppSource::Rust(platform::Root::of::<sudokooler_ui::App>()),
+        platform::AppSource::Rust(platform::Root::of::<sudocooler::App>()),
         platform::AppOptions {
-            title: "Sudokooler — Cooler Companion".to_owned(),
+            title: "sudocooler".to_owned(),
+            #[cfg(target_os = "windows")]
+            icon: Some(std::path::PathBuf::from(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/icon.ico"
+            ))),
             #[cfg(any(target_os = "linux", target_os = "windows"))]
-            app_id: "io.sudokooler.companion".to_owned(),
+            app_id: "io.sudocooler.app".to_owned(),
             size: (1120, 760),
             ..Default::default()
         },

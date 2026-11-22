@@ -1,4 +1,4 @@
-//! Sudokooler companion UI — a Rust-only NSH app.
+//! sudocooler — a Rust-only NSH app for Sudokoo CPU coolers.
 //!
 //! Layers, from the inside out:
 //! `domain` (std only) → `application` (ports/use cases) → `infrastructure`
@@ -14,10 +14,13 @@ pub mod ui;
 
 use nsh_core::prelude::*;
 
+/// The companion's logo, shipped from `assets/logo.png`.
+pub const LOGO: ImageAsset = asset!("logo.png");
+
 /// The crate's UI set, should a TSX entry be added later.
-#[native_module("sudokooler-ui/native")]
+#[native_module("sudocooler/native")]
 fn native(registry: &mut Registry) {
-    registry.register::<App>();
+    registry.register::<App>().assets(assets!());
 }
 
 /// The root component named by `nsh.json` and mounted by `cargo run`.

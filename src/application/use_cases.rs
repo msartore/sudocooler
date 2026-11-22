@@ -1,7 +1,7 @@
 //! Policy that coordinates ports and domain rules.
 
 use crate::domain::device::Device;
-use crate::domain::packet::{encode_packet, format_hex};
+use crate::domain::packet::{encode_l120_packet, encode_packet, format_hex};
 use crate::domain::settings::Settings;
 use crate::domain::telemetry::Telemetry;
 
@@ -14,6 +14,7 @@ pub struct PacketEntry {
     pub sequence: u32,
     pub hex: String,
     pub temperature_c: String,
+    pub protocol: &'static str,
 }
 
 impl PacketEntry {
@@ -32,6 +33,18 @@ impl PacketEntry {
             sequence,
             hex: format_hex(&packet),
             temperature_c: format!("{:.1}", sample.temperature_c),
+            protocol: "sk700v",
+        }
+    }
+
+    /// A preview of the L120 frame used by the ENERGLO 360.
+    pub fn from_l120_sample(sequence: u32, sample: &Telemetry, unit: crate::domain::packet::TempUnit) -> Self {
+        let packet = encode_l120_packet(sample, unit);
+        Self {
+            sequence,
+            hex: format_hex(&packet),
+            temperature_c: format!("{:.1}", sample.temperature_c),
+            protocol: "l120",
         }
     }
 }
