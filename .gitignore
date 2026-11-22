@@ -2,6 +2,9 @@
 /target/
 /.nsh/
 
+# Release staging (may contain downloaded third-party binaries; never commit)
+/dist/
+
 # Editors and OS
 .vscode/
 .idea/
