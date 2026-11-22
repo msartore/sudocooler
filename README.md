@@ -69,6 +69,11 @@ daemon uses one of two backends for those two values:
 Without PawnIO or HWiNFO64, load and clock still work, but temperature and power
 are reported as `0.0 °C` / `0 W`. This app does not invent those numbers.
 
+On Linux, the daemon reads temperature, power, load and frequency from sysfs
+(`/sys/class/hwmon`, `powercap`, `/proc/stat`, `cpufreq`) with no extra background
+app or elevation. HID access needs a udev rule for VID `0x381C`; the daemon's
+submodule ships `packaging/99-sudokooler.rules` (installed by the Linux package).
+
 ## Architecture
 
 ```
@@ -122,8 +127,10 @@ The **Start at login** row in Settings manages a Windows Scheduled Task named
 `sudocooler`. It is created with `schtasks.exe /Create /TN sudocooler /SC ONLOGON
 /RL HIGHEST /F`: it runs at logon with **highest privileges** (elevated) and no
 console window. Elevation is needed for PawnIO-based temperature and power
-readings. Turning the setting off deletes the task. Autostart is Windows-only;
-the task uses this app's own executable, not the daemon's installer.
+readings. Turning the setting off deletes the task. On Linux the same setting
+writes an XDG autostart entry at `~/.config/autostart/sudocooler.desktop`;
+no elevation is needed there. Both use this app's own executable, not the
+daemon's installer.
 
 ## Updates
 

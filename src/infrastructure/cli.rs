@@ -41,7 +41,12 @@ impl CliDaemon {
         if let Ok(exe) = std::env::current_exe()
             && let Some(dir) = exe.parent()
         {
-            for name in ["sudokooler.exe", "sudokooler", "nsh/sudokooler.exe"] {
+            for name in [
+                "sudokooler.exe",
+                "sudokooler",
+                "nsh/sudokooler.exe",
+                "nsh/sudokooler",
+            ] {
                 let path = dir.join(name);
                 if path.is_file() {
                     return Ok(path);
@@ -71,6 +76,20 @@ impl CliDaemon {
         );
         if Path::new(absolute).is_file() {
             return Ok(PathBuf::from(absolute));
+        }
+        let absolute_linux = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/sudokooler/target/debug/sudokooler"
+        );
+        if Path::new(absolute_linux).is_file() {
+            return Ok(PathBuf::from(absolute_linux));
+        }
+        let absolute_release_linux = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/sudokooler/target/release/sudokooler"
+        );
+        if Path::new(absolute_release_linux).is_file() {
+            return Ok(PathBuf::from(absolute_release_linux));
         }
         Err(AppError::new(
             ErrorKind::Unavailable,

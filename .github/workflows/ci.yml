@@ -12,8 +12,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: check, test and package
+  build-windows:
+    name: check, test and package (Windows)
     runs-on: windows-latest
 
     steps:
@@ -74,5 +74,71 @@ jobs:
         with:
           name: sudocooler-portable
           path: dist/sudocooler-portable.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  build-linux:
+    name: check, test and package (Linux)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout (with daemon submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Linux build dependencies
+        # NSH's Linux runner needs GTK 4.14+ dev headers; hidapi needs libudev.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev clang libudev-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            sudokooler -> sudokooler/target
+
+      - name: Install NSH 0.5
+        env:
+          NSH_VERSION: v0.5.0
+        run: |
+          curl -fsSL https://nsh.dev/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Headless app tests
+        run: nsh test
+
+      - name: Daemon tests
+        run: cargo test --manifest-path sudokooler/Cargo.toml
+
+      - name: Build portable Linux release
+        run: bash installer/build-linux.sh
+
+      - name: Upload Linux update archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: sudocooler-linux-update
+          path: dist/sudocooler-*-linux-x86_64.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Linux portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: sudocooler-linux-portable
+          path: dist/sudocooler-linux-portable.tar.gz
           if-no-files-found: error
           retention-days: 7

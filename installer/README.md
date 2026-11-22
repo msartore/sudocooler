@@ -1,16 +1,18 @@
-# sudocooler - Windows installer & portable package
+# sudocooler - installers & portable packages
 
-These scripts build, stage and install a Windows release of **sudocooler** (the
-NSH app) together with the **sudokooler** daemon from the git submodule. All
-scripts target Windows 10/11 and PowerShell 5.1+. The portable flow does not need
-administrator rights; the `setup.exe` installer does, because it registers an
-elevated logon task for PawnIO telemetry.
+The scripts here build, stage and install releases of **sudocooler** (the NSH
+app) together with the **sudokooler** daemon from the git submodule. Windows
+scripts target Windows 10/11 and PowerShell 5.1+; `build-linux.sh` targets Linux
+(Ubuntu 24.04+). Portable flows do not need administrator rights; the Windows
+`setup.exe` installer does, because it registers an elevated logon task for
+PawnIO telemetry.
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
 | `build-release.ps1` | Builds app + daemon, downloads PawnIO assets into build output, stages `dist\sudocooler-portable\`, zips it, and compiles `sudocooler-setup.exe` when Inno Setup is available. |
+| `build-linux.sh` | Builds app + daemon for Linux, stages `dist/sudocooler-linux-portable/`, tars it, and copies the NSH archive to the update-manifest name `dist/sudocooler-<version>-linux-x86_64.tar.gz`. Bundles the upstream udev rule; no PawnIO downloads. |
 | `sudocooler.iss` | Inno Setup script for the setup executable. |
 | `install.ps1` | Installs the extracted portable package per-user, creates a Start Menu shortcut, registers the elevated logon task, optionally installs PawnIO. |
 | `uninstall.ps1` | Removes the task, shortcut, daemon path variable and install folder. |
@@ -25,7 +27,71 @@ elevated logon task for PawnIO telemetry.
 - **Inno Setup 6** (`choco install innosetup`) to produce `sudocooler-setup.exe`.
   Without it the portable zip is still built and a warning is printed.
 
-## 1. Build a portable release
+## Linux portable build (Ubuntu 24.04+)
+
+Prerequisites:
+
+- Rust toolchain (`cargo`) on PATH - normally `$HOME/.cargo/bin`.
+- NSH 0.5 CLI (`nsh`) on PATH - installed to `$HOME/.local/bin` by
+  `NSH_VERSION=v0.5.0 curl -fsSL https://nsh.dev/install.sh | sh`. The script
+  probes both locations automatically.
+- GTK 4.14+ development headers for the NSH Linux runner, plus clang and
+  libudev (hidapi): `sudo apt-get update && sudo apt-get install -y libgtk-4-dev clang libudev-dev`.
+- The daemon submodule initialized: `git submodule update --init --recursive`.
+
+From the repository root:
+
+```sh
+bash installer/build-linux.sh
+```
+
+Result:
+
+```text
+dist/sudocooler-linux-portable/               staging folder (ready to run in place)
+  sudocooler/                                 NSH app bundle (runner + assets)
+  sudokooler                                  daemon, built from the submodule (release)
+  99-sudokooler.rules                         upstream udev rule for HID access
+  README.md, INSTALLER_README.md, APP_README.md, THIRD_PARTY_LICENSES.txt
+dist/sudocooler-linux-portable.tar.gz         staged folder as a tarball
+dist/sudocooler-<version>-linux-x86_64.tar.gz NSH archive used by latest.json
+```
+
+The version is read from `nsh.json`. NSH 0.5 has no `--release` flag on
+`nsh package`, so the script runs `nsh build --release` first and then
+`nsh package --target linux`. No PawnIO or other signed binaries are downloaded
+or shipped on Linux: the daemon reads sensors from sysfs and `/proc`.
+
+### udev rule: required for HID access
+
+The daemon talks to the cooler over `/dev/hidraw*`. Unprivileged users need the
+included upstream rule installed (from the staged folder or the portable
+tarball):
+
+```sh
+sudo cp 99-sudokooler.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+Replug the cooler or reboot afterwards. The rule matches Sudokoo HID devices
+(`SUBSYSTEM=="hidraw"`, `ATTRS{idVendor}=="381c"`) with `MODE="0660"` and the
+`uaccess` tag. Without it the app can list devices but reads/writes fail with
+permission denied. The rule comes from `sudokooler/packaging/99-sudokooler.rules`
+in the daemon submodule and is never edited by this repository.
+
+Run the portable build with:
+
+```sh
+cd dist/sudocooler-linux-portable
+SUDOKOOLER_BIN="$PWD/sudokooler" ./sudocooler/sudocooler
+```
+
+Use the actual runner name inside `sudocooler/` if your NSH bundle differs.
+`SUDOKOOLER_BIN` is the reliable way for the app to find the bundled daemon
+from an arbitrary extraction directory.
+
+## 1. Build a portable Windows release
 
 From the repository root:
 

@@ -15,8 +15,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release:
-    name: build and publish portable release
+  build-windows:
+    name: build Windows release
     runs-on: windows-latest
 
     steps:
@@ -50,10 +50,94 @@ jobs:
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\build-release.ps1
 
-      - name: Write update manifest
+      - name: Upload Windows build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: |
+            dist/sudocooler-portable.zip
+            dist/sudocooler-setup.exe
+            dist/sudocooler-*-windows-x86_64.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  build-linux:
+    name: build Linux release
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout (with daemon submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev clang libudev-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            sudokooler -> sudokooler/target
+
+      - name: Install NSH 0.5
+        env:
+          NSH_VERSION: v0.5.0
+        run: |
+          curl -fsSL https://nsh.dev/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build portable Linux release
+        run: bash installer/build-linux.sh
+
+      - name: Upload Linux build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux
+          path: |
+            dist/sudocooler-*-linux-x86_64.tar.gz
+            dist/sudocooler-linux-portable.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: write update manifest and publish release
+    needs: [build-windows, build-linux]
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install NSH 0.5
         shell: pwsh
         run: |
-          nsh update-manifest dist\sudocooler-*-windows-x86_64.zip --entry . --base-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" -o dist
+          $env:NSH_VERSION = 'v0.5.0'
+          irm https://nsh.dev/install.ps1 | iex
+          "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Download Windows build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-windows
+          path: dist
+
+      - name: Download Linux build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-linux
+          path: dist
+
+      - name: Write update manifest for Windows and Linux
+        shell: pwsh
+        run: |
+          nsh update-manifest dist\sudocooler-*-windows-x86_64.zip dist\sudocooler-*-linux-x86_64.tar.gz --entry . --base-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" -o dist
 
       - name: Name artifacts and write checksums
         shell: pwsh
@@ -62,6 +146,8 @@ jobs:
           Move-Item -LiteralPath dist\sudocooler-portable.zip -Destination "dist\$zip"
           $setup = "sudocooler-$env:GITHUB_REF_NAME-setup.exe"
           Move-Item -LiteralPath dist\sudocooler-setup.exe -Destination "dist\$setup"
+          $linuxPortable = "sudocooler-$env:GITHUB_REF_NAME-linux-portable.tar.gz"
+          Move-Item -LiteralPath dist\sudocooler-linux-portable.tar.gz -Destination "dist\$linuxPortable"
           $files = @(Get-ChildItem -LiteralPath dist -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' })
           $lines = $files | ForEach-Object {
             $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -76,6 +162,8 @@ jobs:
             dist/sudocooler-*-portable.zip
             dist/sudocooler-*-setup.exe
             dist/sudocooler-*-windows-x86_64.zip
+            dist/sudocooler-*-linux-x86_64.tar.gz
+            dist/sudocooler-*-linux-portable.tar.gz
             dist/latest.json
             dist/SHA256SUMS.txt
           fail_on_unmatched_files: true
