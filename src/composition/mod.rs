@@ -50,6 +50,15 @@ pub fn close_l120() {
     crate::infrastructure::hid_writer::close();
 }
 
+/// Self-update from GitHub Releases.
+pub fn check_update() -> Result<String, String> {
+    crate::infrastructure::updates::check()
+}
+
+pub fn install_update() -> Result<String, String> {
+    crate::infrastructure::updates::install()
+}
+
 /// Windows logon autostart controls.
 pub fn autostart_enabled() -> bool {
     crate::infrastructure::autostart::is_enabled()

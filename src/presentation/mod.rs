@@ -42,6 +42,8 @@ pub struct AppState {
     pub settings: Signal<Settings>,
     pub backend: Signal<&'static str>,
     pub error: Signal<Option<String>>,
+    /// Status of the last update check or install.
+    pub update_status: Signal<String>,
     /// Heartbeat counter, used to pace sampling at the configured interval.
     pub tick: Signal<u64>,
 }
@@ -63,6 +65,7 @@ pub fn app() -> impl IntoElement {
         settings: signal(Settings::default()),
         backend: signal("sudocooler CLI"),
         error: signal(None),
+        update_status: signal("Not checked".to_owned()),
         tick: signal(0_u64),
     };
 

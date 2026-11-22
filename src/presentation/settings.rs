@@ -95,6 +95,34 @@ pub fn screen(state: AppState) -> impl IntoElement {
                             *settings = settings.clone().with_temp_unit(unit)
                         });
                     },
+                ))
+                .child(ui::setting_row(
+                    "Software update",
+                    "Check GitHub Releases for a newer version",
+                    move || state.update_status.get(),
+                    move || {
+                        let status = state.update_status;
+                        spawn(async move {
+                            status.set(match composition::check_update() {
+                                Ok(message) => message,
+                                Err(error) => format!("Check failed: {error}"),
+                            });
+                        });
+                    },
+                ))
+                .child(ui::setting_row(
+                    "Install update",
+                    "Download, verify and replace the running app",
+                    || "Run".to_owned(),
+                    move || {
+                        let status = state.update_status;
+                        spawn(async move {
+                            status.set(match composition::install_update() {
+                                Ok(message) => message,
+                                Err(error) => format!("Install failed: {error}"),
+                            });
+                        });
+                    },
                 )),
         ))
         .child(ui::card(
