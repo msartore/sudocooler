@@ -45,7 +45,9 @@ numeric telemetry and a seven-segment preview, not arbitrary graphics.
   contiguous hex, in a bounded log.
 - **Device list** — HID interfaces from the OS tree with enabled/verified status;
   unverified PIDs are visible but stay read-only.
-- **System tray** — icon with Show window, Pause/Resume and Quit; quitting closes
+- **System tray** — icon with Show window, Pause/Resume and Quit. Closing the
+  window hides the app into the tray instead of exiting; opening it again brings
+  the existing instance forward (single instance). Quitting from the tray closes
   the cooler display cleanly.
 - **Settings** — polling interval, temperature unit sent to the cooler, Windows
   logon autostart, and links to the app, daemon and website.

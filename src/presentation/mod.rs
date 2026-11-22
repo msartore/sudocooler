@@ -9,6 +9,7 @@ pub mod settings;
 use std::time::Duration;
 
 use nsh_base::theme;
+use nsh_core::desktop::WindowAttributes;
 use nsh_core::element::desktop::{MenuItem, current_window, set_tray, tray};
 use nsh_core::prelude::*;
 
@@ -66,6 +67,16 @@ pub fn app() -> impl IntoElement {
     };
 
     provide_context(AppDeps::new());
+
+    // Closing the window hides it into the tray; the Quit tray item exits.
+    // Set the attribute in code as well as nsh.json: direct cargo runs do not
+    // load the app manifest.
+    let window = current_window();
+    let mut attributes = WindowAttributes::default();
+    attributes.close_on_press = Some(false);
+    window.set(attributes);
+    let hide_on_close = window.clone();
+    window.on_close_press(move |_| hide_on_close.hide());
 
     // System tray: always available, with a live pause/resume action.
     let tray_running = state.running;
