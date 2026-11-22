@@ -4,6 +4,7 @@
 //! detects the cooler that is actually plugged in even when the daemon binary
 //! has not been built. Detection never opens or writes to the device.
 
+#[cfg(windows)]
 use std::process::Command;
 
 #[cfg(windows)]
@@ -67,10 +68,9 @@ fn detected_pids() -> Vec<u16> {
                 && parts[1].eq_ignore_ascii_case("0000381C")
                 && let Ok(pid) =
                     u16::from_str_radix(&parts[2][parts[2].len().saturating_sub(4)..], 16)
+                && !pids.contains(&pid)
             {
-                if !pids.contains(&pid) {
-                    pids.push(pid);
-                }
+                pids.push(pid);
             }
         }
     }
