@@ -2,14 +2,16 @@
 
 These scripts build, stage and install a Windows release of **sudocooler** (the
 NSH app) together with the **sudokooler** daemon from the git submodule. All
-scripts target Windows 10/11 and PowerShell 5.1+; none of them need administrator
-rights for the app itself.
+scripts target Windows 10/11 and PowerShell 5.1+. The portable flow does not need
+administrator rights; the `setup.exe` installer does, because it registers an
+elevated logon task for PawnIO telemetry.
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| `build-release.ps1` | Builds app + daemon, downloads PawnIO assets into build output, stages `dist\sudocooler-portable\` and zips it to `dist\sudocooler-portable.zip`. |
+| `build-release.ps1` | Builds app + daemon, downloads PawnIO assets into build output, stages `dist\sudocooler-portable\`, zips it, and compiles `sudocooler-setup.exe` when Inno Setup is available. |
+| `sudocooler.iss` | Inno Setup script for the setup executable. |
 | `install.ps1` | Installs the extracted portable package per-user, creates a Start Menu shortcut, registers the elevated logon task, optionally installs PawnIO. |
 | `uninstall.ps1` | Removes the task, shortcut, daemon path variable and install folder. |
 
@@ -20,6 +22,8 @@ rights for the app itself.
   probe both of those locations automatically.
 - The daemon submodule initialized: `git submodule update --init --recursive`.
 - Internet access for the PawnIO downloads (or use `-SkipPawnIO` offline).
+- **Inno Setup 6** (`choco install innosetup`) to produce `sudocooler-setup.exe`.
+  Without it the portable zip is still built and a warning is printed.
 
 ## 1. Build a portable release
 
@@ -61,8 +65,19 @@ Notes:
   `sudocooler.exe` + `nsh\`) and/or `-DaemonBinary <path>`.
 - `-SkipPawnIO` builds without downloads; you must then install PawnIO manually
   for CPU temperature/power telemetry.
+- With Inno Setup installed, the same command also produces
+  `dist\sudocooler-setup.exe`: a conventional wizard that installs to
+  `Program Files\sudocooler`, adds Start Menu / optional desktop shortcuts,
+  registers the elevated ONLOGON task, installs PawnIO only when it is missing,
+  and removes the task on uninstall.
 
-## 2. Use it portably
+## 2. Use the setup executable
+
+Run `dist\sudocooler-setup.exe` and approve the UAC prompt. It installs the app,
+daemon and PawnIO assets, then offers to launch sudocooler. To remove it, use
+**Settings → Apps → sudocooler → Uninstall** or the Start Menu uninstaller.
+
+## 3. Use it portably
 
 Extract the zip anywhere and run `sudocooler.exe`. The app finds the daemon via
 the `SUDOKOOLER_BIN` environment variable (set by `install.ps1`) or a
@@ -78,7 +93,7 @@ The daemon finds the signed module at `<exe_dir>\pawnio\AMDFamily17.bin`, via
 `SUDOKOOLER_PAWNIO_MODULE`, or at
 `C:\Program Files\PawnIO\modules\AMDFamily17.bin`.
 
-## 3. Install per-user
+## 4. Install per-user
 
 From the **extracted** portable folder:
 
@@ -119,7 +134,7 @@ and `-Confirm` prompts. `-SkipTask` registers no task (the Start Menu shortcut
 still works). A warning is printed (not an error) when PawnIO is missing and
 `-InstallPawnIO` was not passed.
 
-## 4. Uninstall
+## 5. Uninstall
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Programs\sudocooler\uninstall.ps1"

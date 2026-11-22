@@ -273,7 +273,7 @@ try {
 sudocooler Windows Portable Release - Third-Party Licenses and Sources
 ======================================================================
 
-1. sudocooler app (sudocooler.exe and nsh\) - MIT
+1. sudocooler app (sudocooler.exe and nsh\) - GPL-3.0
    Source: https://github.com/msartore/sudocooler
 
 2. sudokooler daemon (sudokooler.exe) - MIT
@@ -292,11 +292,36 @@ never stored in this project's git repository.
 
     Compress-Archive -Path (Join-Path $stageDir '*') -DestinationPath $zipPath -Force
 
+    # -----------------------------------------------------------------------
+    # 5. Windows setup.exe (Inno Setup), when the compiler is available
+    # -----------------------------------------------------------------------
+    $setupPath = Join-Path $OutDir 'sudocooler-setup.exe'
+    $isccCandidates = @(
+        (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+        (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe')
+    )
+    $iscc = $isccCandidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+    if ($iscc) {
+        Write-Step '[5/5] Building the Windows setup executable ...'
+        Invoke-NativeChecked -FilePath $iscc -Arguments @(
+            ("/D`"SourceDir=$stageDir`""),
+            ("/D`"OutDir=$OutDir`""),
+            (Join-Path $PSScriptRoot 'sudocooler.iss')
+        ) -Description 'Inno Setup compiler'
+    }
+    else {
+        Write-Warning 'Inno Setup was not found; sudocooler-setup.exe was not built. Install it with: choco install innosetup'
+    }
+
     Write-Host ''
     Write-Host 'Build complete.' -ForegroundColor Green
     Write-Host "  Portable folder : $stageDir"
     Write-Host "  Portable zip    : $zipPath"
-    Write-Host '  Next: extract the zip anywhere and run install.ps1 from the extracted folder.'
+    if (Test-Path -LiteralPath $setupPath) {
+        Write-Host "  Setup executable: $setupPath"
+    }
+    Write-Host '  Next: run sudocooler-setup.exe, or extract the zip and run install.ps1.'
 }
 finally {
     if (Test-Path -LiteralPath $tempDir) {
