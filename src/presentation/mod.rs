@@ -25,12 +25,6 @@ use crate::ui;
 /// Profile default from `profiles/default_devices.toml`.
 const POWER_BAR_MAX_W: u16 = 160;
 
-/// The section shown in the content column.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Tab {
-    Home,
-}
-
 /// All state the screens share. Signals are `Copy` handles, so screens get a
 /// cheap snapshot of the app without owning a global singleton.
 #[derive(Clone, Copy)]
@@ -220,10 +214,7 @@ fn shell(state: AppState) -> impl IntoElement {
     let settings_open = signal(false);
     view()
         .flex_1()
-        .flex_row()
-        .style_when(|| window().width.0 < 700.0, |style| style.flex_col())
-        .child(sidebar(state))
-        .child(view().flex_1().child(top_bar(state, settings_open)))
+        .child(top_bar(state, settings_open))
         .child(
             scroll()
                 .flex_1()
@@ -236,15 +227,22 @@ fn shell(state: AppState) -> impl IntoElement {
         ))
 }
 
-/// The Home top bar: settings opens a modal, logs opens its own window.
+/// Top bar: branding on the left, Settings (modal) and Logs (window) on the right.
 fn top_bar(state: AppState, settings_open: Signal<bool>) -> impl IntoElement {
     view()
         .flex_row()
         .items_center()
-        .justify_end()
-        .gap_2()
+        .gap_3()
         .px_4()
         .pt_3()
+        .child(image(crate::LOGO).size(px(28.0)))
+        .child(
+            text("sudocooler")
+                .text_size(px(15.0))
+                .font_weight(FontWeight::BOLD)
+                .text_color(move || theme().foreground),
+        )
+        .child(view().flex_1())
         .child(ui::action_with_icon(
             asset!("icons/settings.svg"),
             || "Settings".to_owned(),
@@ -305,74 +303,6 @@ fn settings_modal(state: AppState, open: Signal<bool>) -> impl IntoElement {
                         ),
                 )
                 .child(scroll().flex_1().child(settings::cards(state))),
-        )
-}
-
-fn sidebar(state: AppState) -> impl IntoElement {
-    let items = [(Tab::Home, "Home", asset!("icons/layout-dashboard.svg"))];
-
-    let mut nav = view().flex_col().gap_1().child(
-        view()
-            .flex_row()
-            .items_center()
-            .gap_2()
-            .px_3()
-            .pb_5()
-            .child(image(crate::LOGO).size(px(34.0)))
-            .child(
-                view()
-                    .gap_0p5()
-                    .child(
-                        text("sudocooler")
-                            .text_size(px(15.0))
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(move || theme().foreground),
-                    )
-                    .child(
-                        text("CPU cooler dashboard")
-                            .text_size(px(11.0))
-                            .text_color(move || theme().muted_foreground),
-                    ),
-            ),
-    );
-
-    for (_, label, icon) in items {
-        nav = nav.child(
-            view()
-                .flex_row()
-                .items_center()
-                .gap_2()
-                .px_3()
-                .py(px(10.0))
-                .rounded(px(9.0))
-                .bg(move || theme().sidebar_accent)
-                .child(
-                    image(icon)
-                        .size(px(17.0))
-                        .tint_color(move || theme().sidebar_foreground),
-                )
-                .child(
-                    text(label)
-                        .text_size(px(13.0))
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(move || theme().sidebar_foreground),
-                ),
-        );
-    }
-
-    view()
-        .w(px(196.0))
-        .flex_col()
-        .p(px(16.0))
-        .bg(move || theme().sidebar)
-        .child(nav)
-        .child(view().flex_grow(1.0))
-        .child(
-            view().px_3().child(
-                text(move || state.backend.get().to_owned())
-                    .text_size(px(10.0))
-                    .text_color(move || theme().muted_foreground),
-            ),
         )
 }
 
