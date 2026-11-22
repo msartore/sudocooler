@@ -22,15 +22,13 @@ pub fn screen(state: AppState) -> impl IntoElement {
                 .flex_row()
                 .gap_4()
                 .style_when(|| window().width.0 < 900.0, |style| style.flex_col())
-                .child(
-                    ui::card(
-                        "Cooler display preview",
-                        ui::segment_display(
-                            move || state.telemetry.get().temperature_c,
-                            move || state.power_bar_pct(),
-                        ),
+                .child(ui::card(
+                    "Cooler display preview",
+                    ui::segment_display(
+                        move || state.telemetry.get().temperature_c,
+                        move || state.power_bar_pct(),
                     ),
-                )
+                ))
                 .child(
                     view()
                         .flex_1()
@@ -105,7 +103,13 @@ pub fn screen(state: AppState) -> impl IntoElement {
 /// Shown when a detected device is outside the daemon's verified profile set.
 fn unsupported_notice(state: AppState) -> impl IntoElement {
     when(
-        move || state.devices.get().iter().any(|device| device.connected && !device.enabled),
+        move || {
+            state
+                .devices
+                .get()
+                .iter()
+                .any(|device| device.connected && !device.enabled)
+        },
         move || {
             view()
                 .p_3()

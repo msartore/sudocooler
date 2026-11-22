@@ -66,7 +66,9 @@ pub fn encode_packet(telemetry: &Telemetry, max_watts: u16, unit: TempUnit) -> [
 /// MasterCraft's `generateCheckDigit` sums every payload byte, keeps the low
 /// byte and appends `0x16`. The host then prefixes HID report ID `0x10`.
 pub fn l120_frame(payload: &[u8]) -> Vec<u8> {
-    let checksum = payload.iter().fold(0u8, |acc, &byte| acc.wrapping_add(byte));
+    let checksum = payload
+        .iter()
+        .fold(0u8, |acc, &byte| acc.wrapping_add(byte));
     let mut frame = Vec::with_capacity(payload.len() + 3);
     frame.push(0x10);
     frame.extend_from_slice(payload);
@@ -100,12 +102,16 @@ pub fn encode_l120_packet(telemetry: &Telemetry, unit: TempUnit) -> Vec<u8> {
 
 /// MasterCraft's `displayOpen` command: `68 01 10 02 01 01 00...`.
 pub fn encode_l120_display_open() -> Vec<u8> {
-    l120_frame(&[0x68, 0x01, 0x10, 0x02, 0x01, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    l120_frame(&[
+        0x68, 0x01, 0x10, 0x02, 0x01, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ])
 }
 
 /// MasterCraft's `displayClose` command: `68 01 10 0C 01 00 00...`.
 pub fn encode_l120_display_close() -> Vec<u8> {
-    l120_frame(&[0x68, 0x01, 0x10, 0x0C, 0x01, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    l120_frame(&[
+        0x68, 0x01, 0x10, 0x0C, 0x01, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ])
 }
 
 /// Lowercase contiguous hex, as printed by `sudokooler --dry-run`.

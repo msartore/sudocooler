@@ -53,7 +53,7 @@ pub fn open() -> Result<(), String> {
         })
         .ok_or_else(|| format!("no HID interface for {VID:04X}:{PID:04X}"))?;
     let device = api
-        .open_path(&info.path())
+        .open_path(info.path())
         .map_err(|e| format!("cannot open ENERGLO 360 ({VID:04X}:{PID:04X}): {e}"))?;
     *guard = Some(Connection { _api: api, device });
     Ok(())

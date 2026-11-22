@@ -16,28 +16,20 @@ pub fn screen(state: AppState) -> impl IntoElement {
             "Devices",
             "Only enabled profiles with VID 0x381C are ever written to.",
         ))
-        .child(
-            view()
-                .flex_row()
-                .gap_2()
-                .child(ui::action(
-                    || "Rescan USB".to_owned(),
-                    true,
-                    move || rescan(state),
-                )),
-        )
-        .child(
-            ui::card(
-                "USB HID interfaces",
-                each(
-                    state.devices,
-                    |device| (device.vid, device.pid),
-                    move |device, _| device_row(device),
-                ),
+        .child(view().flex_row().gap_2().child(ui::action(
+            || "Rescan USB".to_owned(),
+            true,
+            move || rescan(state),
+        )))
+        .child(ui::card(
+            "USB HID interfaces",
+            each(
+                state.devices,
+                |device| (device.vid, device.pid),
+                move |device, _| device_row(device),
             ),
-        )
+        ))
 }
-
 
 fn device_row(device: ReadSignal<Device>) -> impl IntoElement {
     let tone = if device.get().is_writable() {

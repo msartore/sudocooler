@@ -4,8 +4,8 @@
 //! answers is decided here, never in a screen. The real daemon and OS HID
 //! tree are always used — there is no demo switch.
 
-use crate::application::ports::TelemetrySource;
 use crate::application::AppError;
+use crate::application::ports::TelemetrySource;
 use crate::domain::device::Device;
 use crate::domain::telemetry::Telemetry;
 use crate::infrastructure::cli::CliDaemon;
@@ -18,6 +18,12 @@ pub struct AppDeps;
 impl AppDeps {
     pub fn new() -> Self {
         Self
+    }
+}
+
+impl Default for AppDeps {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

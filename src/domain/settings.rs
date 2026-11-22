@@ -74,7 +74,13 @@ mod tests {
 
     #[test]
     fn step_clamps_to_bounds() {
-        assert_eq!(Settings::default().stepped(-100_000).interval_ms, MIN_INTERVAL_MS);
-        assert_eq!(Settings::default().stepped(100_000).interval_ms, MAX_INTERVAL_MS);
+        assert_eq!(
+            Settings::default().stepped(-100_000).interval_ms,
+            MIN_INTERVAL_MS
+        );
+        assert_eq!(
+            Settings::default().stepped(100_000).interval_ms,
+            MAX_INTERVAL_MS
+        );
     }
 }

@@ -76,7 +76,10 @@ impl CliDaemon {
             command.args(["--config", config]);
         }
         let output = command.output().map_err(|error| {
-            AppError::new(ErrorKind::Unavailable, format!("cannot start sudokooler: {error}"))
+            AppError::new(
+                ErrorKind::Unavailable,
+                format!("cannot start sudokooler: {error}"),
+            )
         })?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();

@@ -206,17 +206,13 @@ pub fn action_with_icon(
                 .flex_row()
                 .items_center()
                 .gap_2()
-                .child(
-                    image(icon)
-                        .size(px(16.0))
-                        .tint_color(move || {
-                            if primary {
-                                theme().primary_foreground
-                            } else {
-                                theme().foreground
-                            }
-                        }),
-                )
+                .child(image(icon).size(px(16.0)).tint_color(move || {
+                    if primary {
+                        theme().primary_foreground
+                    } else {
+                        theme().foreground
+                    }
+                }))
                 .child(
                     text(label)
                         .text_size(px(13.0))
@@ -249,7 +245,11 @@ pub fn setting_row(
             view()
                 .flex_1()
                 .gap_1()
-                .child(text(title).text_size(px(14.0)).font_weight(FontWeight::MEDIUM))
+                .child(
+                    text(title)
+                        .text_size(px(14.0))
+                        .font_weight(FontWeight::MEDIUM),
+                )
                 .child(
                     text(detail)
                         .text_size(px(12.0))
@@ -306,11 +306,7 @@ pub fn segment_digit(digit: impl Fn() -> Option<u8> + Clone + 'static) -> impl I
                     let lit = digit()
                         .and_then(|value| DIGIT_SEGMENTS.get(value as usize))
                         .is_some_and(|segments| segments[index]);
-                    if lit {
-                        display_on()
-                    } else {
-                        display_off()
-                    }
+                    if lit { display_on() } else { display_off() }
                 }),
         );
     }
@@ -358,19 +354,14 @@ pub fn segment_display(
                         .justify_end()
                         .h(px(60.0))
                         .pb(px(6.0))
-                        .child(
-                            view()
-                                .size(px(7.0))
-                                .rounded_full()
-                                .bg(move || display_on()),
-                        ),
+                        .child(view().size(px(7.0)).rounded_full().bg(display_on)),
                 )
                 .child(segment_digit(tenths))
                 .child(
                     text("C")
                         .text_size(px(20.0))
                         .font_weight(FontWeight::BOLD)
-                        .text_color(move || display_on()),
+                        .text_color(display_on),
                 ),
         )
         .child(
@@ -387,19 +378,13 @@ pub fn power_bar(bar: impl Fn() -> u8 + Clone + 'static) -> impl IntoElement {
     let mut row = view().flex_row().gap_1();
     for index in 0..20u8 {
         let bar = bar.clone();
-        row = row.child(
-            view()
-                .flex_1()
-                .h(px(9.0))
-                .rounded(px(2.0))
-                .bg(move || {
-                    if bar() >= (index + 1) * 5 {
-                        display_bar()
-                    } else {
-                        display_off()
-                    }
-                }),
-        );
+        row = row.child(view().flex_1().h(px(9.0)).rounded(px(2.0)).bg(move || {
+            if bar() >= (index + 1) * 5 {
+                display_bar()
+            } else {
+                display_off()
+            }
+        }));
     }
     row
 }

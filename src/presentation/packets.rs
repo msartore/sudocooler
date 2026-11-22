@@ -18,73 +18,69 @@ pub fn screen(state: AppState) -> impl IntoElement {
             "Packets",
             "Preview of the SK700V telemetry report, zero-padded to 64 bytes.",
         ))
-        .child(
-            ui::card(
-                "Latest frame",
-                view()
-                    .gap_2()
-                    .child(
-                        text(move || {
-                            let hex = state
-                                .packets
-                                .get()
-                                .latest()
-                                .map(|entry| entry.hex.clone())
-                                .unwrap_or_default();
-                            if hex.is_empty() {
-                                "Waiting for the first sample...".to_owned()
-                            } else {
-                                hex.chars().take(64).collect()
-                            }
-                        })
-                        .font_family(
-                            theme()
-                                .font_mono
-                                .clone()
-                                .unwrap_or_else(|| "monospace".into()),
-                        )
-                        .text_size(px(12.0))
-                        .text_color(move || theme().foreground),
+        .child(ui::card(
+            "Latest frame",
+            view()
+                .gap_2()
+                .child(
+                    text(move || {
+                        let hex = state
+                            .packets
+                            .get()
+                            .latest()
+                            .map(|entry| entry.hex.clone())
+                            .unwrap_or_default();
+                        if hex.is_empty() {
+                            "Waiting for the first sample...".to_owned()
+                        } else {
+                            hex.chars().take(64).collect()
+                        }
+                    })
+                    .font_family(
+                        theme()
+                            .font_mono
+                            .clone()
+                            .unwrap_or_else(|| "monospace".into()),
                     )
-                    .child(
-                        text(move || {
-                            state
-                                .packets
-                                .get()
-                                .latest()
-                                .map(|entry| entry.hex.chars().skip(64).collect::<String>())
-                                .unwrap_or_default()
-                        })
-                        .font_family(
-                            theme()
-                                .font_mono
-                                .clone()
-                                .unwrap_or_else(|| "monospace".into()),
-                        )
-                        .text_size(px(12.0))
-                        .text_color(move || theme().foreground),
-                    )
-                    .child(
-                        text("10 68 01 09 0D 01 02 | power | temp f32 | load | freq | csum | 16")
-                            .text_size(px(11.0))
-                            .text_color(move || theme().muted_foreground),
-                    ),
-            ),
-        )
-        .child(
-            ui::card(
-                "Frame log",
-                when(
-                    move || state.packets.get().is_empty(),
-                    move || {
-                        text("No frames yet — resume streaming on the overview.")
-                            .text_size(px(12.0))
-                            .text_color(move || theme().muted_foreground)
-                    },
+                    .text_size(px(12.0))
+                    .text_color(move || theme().foreground),
                 )
-                .otherwise(move || each(entries, |entry| entry.sequence, move |entry, _| row(entry))),
-            ),
-        )
+                .child(
+                    text(move || {
+                        state
+                            .packets
+                            .get()
+                            .latest()
+                            .map(|entry| entry.hex.chars().skip(64).collect::<String>())
+                            .unwrap_or_default()
+                    })
+                    .font_family(
+                        theme()
+                            .font_mono
+                            .clone()
+                            .unwrap_or_else(|| "monospace".into()),
+                    )
+                    .text_size(px(12.0))
+                    .text_color(move || theme().foreground),
+                )
+                .child(
+                    text("10 68 01 09 0D 01 02 | power | temp f32 | load | freq | csum | 16")
+                        .text_size(px(11.0))
+                        .text_color(move || theme().muted_foreground),
+                ),
+        ))
+        .child(ui::card(
+            "Frame log",
+            when(
+                move || state.packets.get().is_empty(),
+                move || {
+                    text("No frames yet — resume streaming on the overview.")
+                        .text_size(px(12.0))
+                        .text_color(move || theme().muted_foreground)
+                },
+            )
+            .otherwise(move || each(entries, |entry| entry.sequence, move |entry, _| row(entry))),
+        ))
 }
 
 fn row(entry: ReadSignal<PacketEntry>) -> impl IntoElement {

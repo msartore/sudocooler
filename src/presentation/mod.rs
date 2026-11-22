@@ -88,9 +88,8 @@ pub fn app() -> impl IntoElement {
                 .tooltip("sudocooler")
                 .menu([
                     MenuItem::new("Show window").on_select(move || current_window().show()),
-                    MenuItem::new(if running { "Pause" } else { "Resume" }).on_select(move || {
-                        tray_running.update(|value| *value = !*value)
-                    }),
+                    MenuItem::new(if running { "Pause" } else { "Resume" })
+                        .on_select(move || tray_running.update(|value| *value = !*value)),
                     MenuItem::new("Quit").on_select(move || {
                         composition::close_l120();
                         std::process::exit(0);
@@ -110,7 +109,7 @@ pub fn app() -> impl IntoElement {
         }
         let settings = state.settings.get();
         let period = (settings.interval_ms / 100).max(1) as u64;
-        if tick % period != 0 {
+        if !tick.is_multiple_of(period) {
             return;
         }
         match composition::sample(settings.config_path.as_deref()) {
@@ -180,25 +179,25 @@ fn shell(state: AppState) -> impl IntoElement {
         .style_when(|| window().width.0 < 700.0, |style| style.flex_col())
         .child(sidebar(state, tab))
         .child(
-            scroll()
-                .flex_1()
-                .p(px(24.0))
-                .child(
-                    when(move || tab.get() == Tab::Dashboard, move || {
-                        dashboard::screen(state)
-                    })
+            scroll().flex_1().p(px(24.0)).child(
+                when(
+                    move || tab.get() == Tab::Dashboard,
+                    move || dashboard::screen(state),
+                )
+                .otherwise(move || {
+                    when(
+                        move || tab.get() == Tab::Devices,
+                        move || devices::screen(state),
+                    )
                     .otherwise(move || {
-                        when(move || tab.get() == Tab::Devices, move || {
-                            devices::screen(state)
-                        })
-                        .otherwise(move || {
-                            when(move || tab.get() == Tab::Packets, move || {
-                                packets::screen(state)
-                            })
-                            .otherwise(move || settings::screen(state))
-                        })
-                    }),
-                ),
+                        when(
+                            move || tab.get() == Tab::Packets,
+                            move || packets::screen(state),
+                        )
+                        .otherwise(move || settings::screen(state))
+                    })
+                }),
+            ),
         )
 }
 
@@ -214,36 +213,32 @@ fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
         (Tab::Settings, "Settings", asset!("icons/settings.svg")),
     ];
 
-    let mut nav = view()
-        .flex_col()
-        .gap_1()
-        .child(
-            view()
-                .flex_row()
-                .items_center()
-                .gap_2()
-                .px_3()
-                .pb_5()
-                .child(image(crate::LOGO).size(px(34.0)))
-                .child(
-                    view()
-                        .gap_0p5()
-                        .child(
-                            text("sudocooler")
-                                .text_size(px(15.0))
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(move || theme().foreground),
-                        )
-                        .child(
-                            text("CPU cooler dashboard")
-                                .text_size(px(11.0))
-                                .text_color(move || theme().muted_foreground),
-                        ),
-                ),
-        );
+    let mut nav = view().flex_col().gap_1().child(
+        view()
+            .flex_row()
+            .items_center()
+            .gap_2()
+            .px_3()
+            .pb_5()
+            .child(image(crate::LOGO).size(px(34.0)))
+            .child(
+                view()
+                    .gap_0p5()
+                    .child(
+                        text("sudocooler")
+                            .text_size(px(15.0))
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(move || theme().foreground),
+                    )
+                    .child(
+                        text("CPU cooler dashboard")
+                            .text_size(px(11.0))
+                            .text_color(move || theme().muted_foreground),
+                    ),
+            ),
+    );
 
     for (value, label, icon) in items {
-        let tab = tab;
         nav = nav.child(
             view()
                 .flex_row()
@@ -260,17 +255,13 @@ fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
                     }
                 })
                 .on_press(move || tab.set(value))
-                .child(
-                    image(icon)
-                        .size(px(17.0))
-                        .tint_color(move || {
-                            if tab.get() == value {
-                                theme().sidebar_foreground
-                            } else {
-                                theme().muted_foreground
-                            }
-                        }),
-                )
+                .child(image(icon).size(px(17.0)).tint_color(move || {
+                    if tab.get() == value {
+                        theme().sidebar_foreground
+                    } else {
+                        theme().muted_foreground
+                    }
+                }))
                 .child(
                     text(label)
                         .text_size(px(13.0))
@@ -294,13 +285,11 @@ fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
         .child(nav)
         .child(view().flex_grow(1.0))
         .child(
-            view()
-                .px_3()
-                .child(
-                    text(move || state.backend.get().to_owned())
+            view().px_3().child(
+                text(move || state.backend.get().to_owned())
                     .text_size(px(10.0))
                     .text_color(move || theme().muted_foreground),
-                ),
+            ),
         )
 }
 

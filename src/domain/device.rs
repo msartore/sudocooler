@@ -71,13 +71,17 @@ pub fn model_name_for_pid(pid: u16) -> &'static str {
 /// `sudokooler/profiles/default_devices.toml`.
 pub fn default_profiles() -> Vec<Device> {
     let mut profiles = Vec::new();
-    for (pid, verified) in [(0x0003u16, true), (0x0001, false), (0x0002, false), (0x0004, false), (0x0005, false)] {
+    for (pid, verified) in [
+        (0x0003u16, true),
+        (0x0001, false),
+        (0x0002, false),
+        (0x0004, false),
+        (0x0005, false),
+    ] {
         // PID 0x0005 was identified as the ENERGLO 360 by the device owner.
         // It is still disabled: the daemon has no verified packet schema for
         // MasterCraft's L120 platform, so this is identification, not support.
-        let name = if verified {
-            format!("Sudokoo {}", model_name_for_pid(pid))
-        } else if pid == 0x0005 {
+        let name = if verified || pid == 0x0005 {
             format!("Sudokoo {}", model_name_for_pid(pid))
         } else {
             format!("Sudokoo Unverified (PID {pid:#06x})")

@@ -38,10 +38,10 @@ fn detected_pids() -> Vec<u16> {
                 .take_while(|c| c.is_ascii_hexdigit())
                 .take(4)
                 .collect();
-            if let Ok(pid) = u16::from_str_radix(&hex, 16) {
-                if !pids.contains(&pid) {
-                    pids.push(pid);
-                }
+            if let Ok(pid) = u16::from_str_radix(&hex, 16)
+                && !pids.contains(&pid)
+            {
+                pids.push(pid);
             }
         }
     }
@@ -59,11 +59,14 @@ fn detected_pids() -> Vec<u16> {
             continue;
         };
         for line in uevent.lines() {
-            let Some(value) = line.strip_prefix("HID_ID=") else { continue };
+            let Some(value) = line.strip_prefix("HID_ID=") else {
+                continue;
+            };
             let parts: Vec<&str> = value.split(':').collect();
             if parts.len() == 3
                 && parts[1].eq_ignore_ascii_case("0000381C")
-                && let Ok(pid) = u16::from_str_radix(&parts[2][parts[2].len().saturating_sub(4)..], 16)
+                && let Ok(pid) =
+                    u16::from_str_radix(&parts[2][parts[2].len().saturating_sub(4)..], 16)
             {
                 if !pids.contains(&pid) {
                     pids.push(pid);

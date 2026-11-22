@@ -2,8 +2,8 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::application::ports::{DeviceSource, TelemetrySource};
 use crate::application::AppError;
+use crate::application::ports::{DeviceSource, TelemetrySource};
 use crate::domain::device::{Device, default_profiles};
 use crate::domain::telemetry::Telemetry;
 

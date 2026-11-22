@@ -38,7 +38,11 @@ impl PacketEntry {
     }
 
     /// A preview of the L120 frame used by the ENERGLO 360.
-    pub fn from_l120_sample(sequence: u32, sample: &Telemetry, unit: crate::domain::packet::TempUnit) -> Self {
+    pub fn from_l120_sample(
+        sequence: u32,
+        sample: &Telemetry,
+        unit: crate::domain::packet::TempUnit,
+    ) -> Self {
         let packet = encode_l120_packet(sample, unit);
         Self {
             sequence,
