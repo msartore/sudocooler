@@ -12,6 +12,7 @@ use nsh_core::element::desktop::{MenuItem, current_window, set_tray, tray};
 use nsh_core::prelude::*;
 use nsh_core::storage::Storage;
 
+use crate::application::PawnIoStatus;
 use crate::composition::{self, AppDeps};
 use crate::domain::device::Device;
 use crate::domain::settings::Settings;
@@ -68,6 +69,8 @@ pub struct AppState {
     pub update_status: Signal<String>,
     /// The daemon's own reason for missing telemetry, when readings are zero.
     pub sensor_notice: Signal<Option<String>>,
+    /// What this process can do with PawnIO; `None` until probed.
+    pub pawnio: Signal<Option<PawnIoStatus>>,
     /// Whether the app is registered to start at logon. A signal so the
     /// toggle repaints immediately after a change.
     pub autostart: Signal<bool>,
@@ -114,6 +117,7 @@ pub fn app() -> impl IntoElement {
         error: signal(None),
         update_status: signal("Not checked".to_owned()),
         sensor_notice: signal(None),
+        pawnio: signal(None),
         autostart: signal(false),
         tick: signal(0_u64),
         sampling: signal(false),
@@ -136,6 +140,9 @@ pub fn app() -> impl IntoElement {
             state.autostart.set(enabled);
         }
     });
+
+    // Probe PawnIO off-thread (it loads a DLL and opens a kernel device).
+    refresh_pawnio(state);
 
     // Persist settings whenever they change, so polling and unit survive a
     // restart.
@@ -243,6 +250,15 @@ pub fn app() -> impl IntoElement {
         .text_color(move || theme().foreground)
         .p_safe_area()
         .child(shell(state))
+}
+
+/// Re-probe PawnIO off the UI thread and publish the result.
+pub fn refresh_pawnio(state: AppState) {
+    spawn(async move {
+        if let Ok(status) = blocking(composition::pawnio_status).await {
+            state.pawnio.set(Some(status));
+        }
+    });
 }
 
 /// Rescan devices in the active adapter and publish the result. The scan

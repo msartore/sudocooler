@@ -302,6 +302,14 @@ try {
                 Copy-Item -LiteralPath $src -Destination (Join-Path $packagedPawnio $moduleName) -Force
             }
         }
+        # Also carry the PawnIO installer so Settings -> Set up PawnIO keeps
+        # working after a self-update.
+        $packagedInstaller = Join-Path $packagedAppDir 'installer'
+        $setupSource = Join-Path $installerAssetsDir 'PawnIO_setup.exe'
+        if (Test-Path -LiteralPath $setupSource) {
+            New-Item -ItemType Directory -Path $packagedInstaller -Force | Out-Null
+            Copy-Item -LiteralPath $setupSource -Destination (Join-Path $packagedInstaller 'PawnIO_setup.exe') -Force
+        }
         Compress-Archive -LiteralPath $packagedAppDir -DestinationPath $updateZip -Force
         Write-Detail "Update archive (with daemon + PawnIO modules): $updateZip"
     }

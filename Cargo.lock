@@ -4990,6 +4990,7 @@ dependencies = [
  "nsh-testing",
  "nsh-updater",
  "ureq 2.12.1",
+ "windows-sys 0.59.0",
  "winres",
 ]
 

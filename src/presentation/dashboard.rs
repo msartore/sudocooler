@@ -146,10 +146,20 @@ fn sensor_notice(state: AppState) -> impl IntoElement {
                 })
                 .child(
                     text(move || {
-                        state.sensor_notice.get().unwrap_or_else(|| {
-                            "CPU temperature and power are unavailable; the daemon did not report a reason."
-                                .to_owned()
-                        })
+                        use crate::application::PawnIoStatus;
+                        match state.pawnio.get() {
+                            Some(PawnIoStatus::Denied) => {
+                                "PawnIO access denied: sudocooler is not running as administrator. Restart it as administrator to read CPU temperature and power.".to_owned()
+                            }
+                            Some(PawnIoStatus::NotInstalled) => {
+                                "CPU temperature and power need PawnIO, which is not installed. Open Settings → Set up PawnIO.".to_owned()
+                            }
+                            Some(PawnIoStatus::Failed(error)) => format!("PawnIO error: {error}"),
+                            _ => state.sensor_notice.get().unwrap_or_else(|| {
+                                "CPU temperature and power are unavailable; the daemon did not report a reason."
+                                    .to_owned()
+                            }),
+                        }
                     })
                     .text_size(px(12.0))
                     .text_color(move || theme().foreground),

@@ -52,6 +52,25 @@ pub fn close_l120() {
     crate::infrastructure::hid_writer::close();
 }
 
+/// What this process can do with PawnIO (temperature/power need it on Windows).
+pub fn pawnio_status() -> crate::application::PawnIoStatus {
+    crate::infrastructure::pawnio::status()
+}
+
+/// Runs the bundled PawnIO installer, then reports the new status.
+pub fn install_pawnio() -> Result<String, String> {
+    let path = crate::infrastructure::pawnio::installer().ok_or_else(|| {
+        "the PawnIO installer is not bundled; run the sudocooler setup again".to_owned()
+    })?;
+    crate::infrastructure::pawnio::run_installer(&path)?;
+    match pawnio_status() {
+        crate::application::PawnIoStatus::Ready { .. } => {
+            Ok("PawnIO is installed; restart sudocooler as administrator".to_owned())
+        }
+        _ => Ok("PawnIO setup finished; restart sudocooler as administrator".to_owned()),
+    }
+}
+
 /// Self-update from GitHub Releases.
 pub fn check_update() -> Result<String, String> {
     crate::infrastructure::updates::check()

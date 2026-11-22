@@ -3,5 +3,6 @@
 pub mod autostart;
 pub mod cli;
 pub mod hid_writer;
+pub mod pawnio;
 pub mod system;
 pub mod updates;

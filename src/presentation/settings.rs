@@ -22,6 +22,7 @@ pub fn cards(state: AppState) -> impl IntoElement {
                 .gap_4()
                 .flex_1()
                 .child(daemon_panel(state))
+                .child(pawnio_panel(state))
                 .child(updates_panel(state))
                 .child(about_panel()),
         )
@@ -115,6 +116,65 @@ fn daemon_panel(state: AppState) -> impl IntoElement {
                     });
                 },
             )),
+    )
+}
+
+fn pawnio_panel(state: AppState) -> impl IntoElement {
+    use crate::application::PawnIoStatus;
+
+    ui::panel(
+        "PawnIO",
+        "Driver that reads CPU temperature and power on Windows",
+        view()
+            .flex_col()
+            .gap_3()
+            .child(
+                text(move || match state.pawnio.get() {
+                    None => "Checking the driver…".to_owned(),
+                    Some(PawnIoStatus::Ready { version }) if version.is_empty() => {
+                        "Not required on this platform.".to_owned()
+                    }
+                    Some(PawnIoStatus::Ready { version }) => {
+                        format!("Installed and accessible (PawnIO {version}).")
+                    }
+                    Some(PawnIoStatus::Denied) => {
+                        "Installed, but this process is not elevated. Restart sudocooler as administrator."
+                            .to_owned()
+                    }
+                    Some(PawnIoStatus::NotInstalled) => {
+                        "Not installed. Temperature and power need PawnIO.".to_owned()
+                    }
+                    Some(PawnIoStatus::Failed(error)) => format!("Error: {error}"),
+                })
+                .text_size(px(12.0))
+                .text_color(move || theme().muted_foreground),
+            )
+            .child(
+                view()
+                    .flex_row()
+                    .gap_2()
+                    .child(ui::choice(
+                        || "Set up PawnIO".to_owned(),
+                        || false,
+                        move || {
+                            let status = state.update_status;
+                            spawn(async move {
+                                let message = match blocking(composition::install_pawnio).await {
+                                    Ok(Ok(message)) => message,
+                                    Ok(Err(error)) => format!("PawnIO: {error}"),
+                                    Err(_) => "PawnIO setup failed".to_owned(),
+                                };
+                                status.set(message);
+                                crate::presentation::refresh_pawnio(state);
+                            });
+                        },
+                    ))
+                    .child(ui::choice(
+                        || "Recheck".to_owned(),
+                        || false,
+                        move || crate::presentation::refresh_pawnio(state),
+                    )),
+            ),
     )
 }
 
