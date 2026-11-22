@@ -1,6 +1,10 @@
-# sudocooler
-
-[![CI](https://github.com/msartore/sudocooler/actions/workflows/ci.yml/badge.svg)](https://github.com/msartore/sudocooler/actions/workflows/ci.yml)
+<div align="center">
+  <img src="assets/logo.png" alt="sudocooler logo" width="120" />
+  <h1>sudocooler</h1>
+  <a href="https://github.com/msartore/sudocooler/actions/workflows/ci.yml">
+    <img src="https://github.com/msartore/sudocooler/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  </a>
+</div>
 
 `sudocooler` is a native desktop app for Sudokoo CPU coolers. It shows live CPU
 telemetry, streams frames to the cooler's display, and stays available from the
