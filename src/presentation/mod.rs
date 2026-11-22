@@ -82,7 +82,10 @@ pub fn app() -> impl IntoElement {
     let initial = Telemetry::new(47.0, 16, 40, 5025).expect("valid initial sample");
     let state = AppState {
         telemetry: signal(initial),
-        devices: signal(composition::discover()),
+        // Do not block the first frame on the OS HID scan: on Windows it shells
+        // out to PowerShell, which can take several seconds on a cold start.
+        // The real scan runs off-thread just below and fills this in.
+        devices: signal(Vec::new()),
         packets: signal(PacketLog::default()),
         running: signal(true),
         settings: signal(Settings::default()),
@@ -95,6 +98,21 @@ pub fn app() -> impl IntoElement {
 
     provide_context(AppDeps::new());
     push_log(state, "info", "sudocooler started");
+
+    // Run the real OS HID scan on a blocking thread so the first frame paints
+    // immediately. Device data is only read by the unsupported-device notice
+    // and the L120 check, both of which tolerate an empty list until it lands.
+    spawn(async move {
+        if let Ok(devices) = blocking(composition::discover).await {
+            let connected = devices.iter().filter(|device| device.connected).count();
+            state.devices.set(devices);
+            push_log(
+                state,
+                "info",
+                format!("USB scan complete: {connected} cooler(s) detected"),
+            );
+        }
+    });
 
     // Closing the window hides it into the tray; the Quit tray item exits.
     // Set the attribute in code as well as nsh.json: direct cargo runs do not
