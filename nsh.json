@@ -1,8 +1,8 @@
 {
   "name": "sudocooler",
   "id": "io.sudocooler.app",
-  "version": "0.1.4",
-  "build": 5,
+  "version": "0.1.5",
+  "build": 6,
   "icon": "assets/logo.png",
   "rust": ".",
   "root": "App",

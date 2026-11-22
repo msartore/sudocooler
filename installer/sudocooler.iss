@@ -9,7 +9,7 @@
 #endif
 
 #define AppName "sudocooler"
-#define AppVersion "0.1.4"
+#define AppVersion "0.1.5"
 #define AppPublisher "msartore"
 #define AppURL "https://msartore.dev"
 #define AppExe "sudocooler.exe"
