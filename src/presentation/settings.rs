@@ -93,12 +93,19 @@ fn daemon_panel(state: AppState) -> impl IntoElement {
                     ),
             )
             .child(ui::toggle_row(
-                composition::autostart_enabled,
+                move || state.autostart.get(),
                 "Start at login",
                 "Launch sudocooler when you sign in",
                 move |_| {
-                    let next = !composition::autostart_enabled();
-                    let _ = composition::set_autostart(next);
+                    // Flip immediately for instant feedback; the registry write runs
+                    // off-thread so the UI never waits on reg.exe.
+                    let next = !state.autostart.get();
+                    state.autostart.set(next);
+                    spawn(async move {
+                        if composition::set_autostart(next).is_err() {
+                            state.autostart.set(composition::autostart_enabled());
+                        }
+                    });
                 },
             )),
     )

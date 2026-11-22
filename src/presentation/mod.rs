@@ -34,6 +34,9 @@ pub struct AppState {
     pub error: Signal<Option<String>>,
     /// Status of the last update check or install.
     pub update_status: Signal<String>,
+    /// Whether the app is registered to start at logon. A signal so the
+    /// toggle repaints immediately after a change.
+    pub autostart: Signal<bool>,
     /// Heartbeat counter, used to pace sampling at the configured interval.
     pub tick: Signal<u64>,
 }
@@ -59,6 +62,7 @@ pub fn app() -> impl IntoElement {
         backend: signal("sudocooler CLI"),
         error: signal(None),
         update_status: signal("Not checked".to_owned()),
+        autostart: signal(composition::autostart_enabled()),
         tick: signal(0_u64),
     };
 
