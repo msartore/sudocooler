@@ -3,7 +3,7 @@ name = "sudocooler"
 version = "0.1.0"
 edition = "2024"
 description = "Native app for Sudokoo CPU coolers, built with NSH"
-license = "MIT"
+license = "GPL-3.0"
 publish = false
 
 # Keep the submodule daemon out of this crate's workspace.
