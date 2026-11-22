@@ -1,12 +1,13 @@
 {
   "name": "sudocooler",
   "id": "io.sudocooler.app",
-  "version": "0.1.2",
-  "build": 3,
+  "version": "0.1.3",
+  "build": 4,
   "icon": "assets/logo.png",
   "rust": ".",
   "root": "App",
   "theme": "theme.json",
+  "updater": { "github": "msartore/sudocooler" },
   "singleInstance": true,
   "window": {
     "title": "sudocooler",
