@@ -30,9 +30,8 @@ The cooler displays numeric telemetry, not arbitrary images or wallpapers.
 - **L120 streaming** — a 19-byte telemetry frame is sent to the ENERGLO 360 on
   each tick; the display opens once and closes on quit.
 - **One Home screen** — telemetry and a preview of the cooler's panel.
-- **Home top bar** — **Settings** opens a modal (polling, temperature unit,
-  autostart, self-update); **Logs** opens a separate window with the last 100
-  in-app events.
+- **Home top bar** — **Settings** opens a modal with polling, temperature unit,
+  autostart, self-update and about.
 - **System tray** — closing the window hides the app into the tray; opening it
   again brings the existing instance forward.
 

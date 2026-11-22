@@ -3,7 +3,7 @@
 use nsh_base::theme;
 use nsh_core::prelude::*;
 
-use super::{AppState, push_log};
+use super::AppState;
 use crate::composition;
 use crate::ui;
 
@@ -74,14 +74,7 @@ pub fn cards(state: AppState) -> impl IntoElement {
                     },
                     move || {
                         let next = !composition::autostart_enabled();
-                        match composition::set_autostart(next) {
-                            Ok(()) => push_log(
-                                state,
-                                "info",
-                                format!("Autostart {}", if next { "enabled" } else { "disabled" }),
-                            ),
-                            Err(error) => push_log(state, "error", format!("Autostart: {error}")),
-                        }
+                        let _ = composition::set_autostart(next);
                     },
                 ))
                 .child(ui::setting_row(
@@ -110,7 +103,6 @@ pub fn cards(state: AppState) -> impl IntoElement {
                                 Ok(message) => message,
                                 Err(error) => format!("Check failed: {error}"),
                             };
-                            push_log(state, "info", message.clone());
                             status.set(message);
                         });
                     },
@@ -126,7 +118,6 @@ pub fn cards(state: AppState) -> impl IntoElement {
                                 Ok(message) => message,
                                 Err(error) => format!("Install failed: {error}"),
                             };
-                            push_log(state, "info", message.clone());
                             status.set(message);
                         });
                     },
@@ -155,14 +146,16 @@ pub fn cards(state: AppState) -> impl IntoElement {
         .child(ui::card(
             "About",
             view()
+                .flex_col()
                 .gap_1()
                 .child(
-                    text("Live daemon telemetry · ENERGLO 360 L120 frames stream automatically")
-                        .text_size(px(12.0))
-                        .font_weight(FontWeight::MEDIUM),
+                    text(concat!("sudocooler ", env!("CARGO_PKG_VERSION")))
+                        .text_size(px(13.0))
+                        .font_weight(FontWeight::SEMIBOLD),
                 )
+                .child(text("A native companion app for Sudokoo CPU coolers.").text_size(px(12.0)))
                 .child(
-                    text("The daemon source lives in the sudokooler/ git submodule.")
+                    text("Built with Native Shell · GPL-3.0 · msartore.dev")
                         .text_size(px(11.0))
                         .text_color(move || theme().muted_foreground),
                 ),
