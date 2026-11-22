@@ -36,7 +36,9 @@ Prerequisites:
   `NSH_VERSION=v0.5.0 curl -fsSL https://nsh.dev/install.sh | sh`. The script
   probes both locations automatically.
 - GTK 4.14+ development headers for the NSH Linux runner, plus clang and
-  libudev (hidapi): `sudo apt-get update && sudo apt-get install -y libgtk-4-dev clang libudev-dev`.
+  libudev (hidapi), GStreamer and WebKitGTK: `sudo apt-get update && sudo apt-get install -y
+  libgtk-4-dev clang libudev-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+  libwebkitgtk-6.0-dev`.
 - The daemon submodule initialized: `git submodule update --init --recursive`.
 
 From the repository root:
