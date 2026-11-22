@@ -3,6 +3,8 @@
 //! Screens use these instead of importing `nsh_base` directly, so a design
 //! change happens here, once.
 
+use std::rc::Rc;
+
 use nsh_base::theme;
 use nsh_core::prelude::*;
 
@@ -66,6 +68,173 @@ pub fn card(title: &'static str, body: impl IntoElement) -> impl IntoElement {
                 .text_color(move || theme().muted_foreground),
         )
         .child(body)
+}
+
+/// A settings panel: a card with a bold title and a muted subtitle above the body.
+pub fn panel(
+    title: &'static str,
+    subtitle: &'static str,
+    body: impl IntoElement,
+) -> impl IntoElement {
+    view()
+        .flex_col()
+        .gap_3()
+        .p(px(18.0))
+        .rounded(move || theme().radius)
+        .border_1()
+        .border_color(move || theme().border)
+        .bg(move || theme().card)
+        .child(
+            view()
+                .flex_col()
+                .gap(px(2.0))
+                .child(
+                    text(title)
+                        .text_size(px(14.0))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(move || theme().foreground),
+                )
+                .child(
+                    text(subtitle)
+                        .text_size(px(12.0))
+                        .text_color(move || theme().muted_foreground),
+                ),
+        )
+        .child(body)
+}
+
+/// A compact button used for mutually-exclusive or toggle choices. The selected
+/// one uses the primary accent; the rest are outlined.
+pub fn choice(
+    label: impl Fn() -> String + 'static,
+    selected: impl Fn() -> bool + 'static,
+    on_press: impl Fn() + 'static,
+) -> impl IntoElement {
+    let selected = Rc::new(selected);
+    let is_on = move || selected();
+
+    let bg_on = is_on.clone();
+    let border_on = is_on.clone();
+    let fg_on = is_on.clone();
+
+    nsh_base::button()
+        .px(px(12.0))
+        .py(px(6.0))
+        .rounded(px(7.0))
+        .bg(move || {
+            if bg_on() {
+                theme().primary
+            } else {
+                theme().secondary
+            }
+        })
+        .border_1()
+        .border_color(move || {
+            if border_on() {
+                theme().primary
+            } else {
+                theme().border
+            }
+        })
+        .active(|style| style.opacity(0.7))
+        .on_press(on_press)
+        .child(
+            text(label)
+                .text_size(px(12.0))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(move || {
+                    if fg_on() {
+                        theme().primary_foreground
+                    } else {
+                        theme().foreground
+                    }
+                }),
+        )
+}
+
+/// A labelled toggle switch: switch on the left, label and hint on the right.
+pub fn toggle_row(
+    checked: impl Fn() -> bool + 'static,
+    label: &'static str,
+    hint: &'static str,
+    on_change: impl Fn(bool) + 'static,
+) -> impl IntoElement {
+    let on = Rc::new(checked);
+    let track_on = on.clone();
+    let thumb_on = on.clone();
+    let press_on = on.clone();
+    let margin_on = on;
+
+    view()
+        .flex_row()
+        .items_start()
+        .gap_3()
+        .py(px(4.0))
+        .on_press(move || on_change(!press_on()))
+        .child(
+            view()
+                .w(px(36.0))
+                .h(px(20.0))
+                .rounded_full()
+                .flex_row()
+                .items_center()
+                .px(px(3.0))
+                .bg(move || {
+                    if track_on() {
+                        theme().primary
+                    } else {
+                        theme().input
+                    }
+                })
+                .child(
+                    view()
+                        .size(px(14.0))
+                        .rounded_full()
+                        .bg(move || {
+                            if thumb_on() {
+                                theme().primary_foreground
+                            } else {
+                                theme().muted_foreground
+                            }
+                        })
+                        .style_when(move || margin_on(), |style| style.ml(px(16.0))),
+                ),
+        )
+        .child(
+            view()
+                .flex_col()
+                .gap(px(2.0))
+                .flex_1()
+                .child(
+                    text(label)
+                        .text_size(px(13.0))
+                        .font_weight(FontWeight::MEDIUM),
+                )
+                .child(
+                    text(hint)
+                        .text_size(px(11.0))
+                        .text_color(move || theme().muted_foreground),
+                ),
+        )
+}
+
+/// A label/value row, with the value in a monospace font.
+pub fn key_value(label: &'static str, value: impl Fn() -> String + 'static) -> impl IntoElement {
+    view()
+        .flex_row()
+        .items_baseline()
+        .gap_4()
+        .child(
+            text(label)
+                .text_size(px(12.0))
+                .text_color(move || theme().muted_foreground),
+        )
+        .child(
+            text(value)
+                .text_size(px(12.0))
+                .text_color(move || theme().foreground)
+                .flex_1(),
+        )
 }
 
 /// A status pill with a reactive label.

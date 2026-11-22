@@ -12,6 +12,6 @@ test("settings opens from the home top bar", async () => {
   const app = await open(".");
   await app.press("Settings");
   expect(app.texts()).toContain("Start at login");
-  expect(app.texts()).toContain("Software update");
+  expect(app.texts()).toContain("Check now");
   expect(app.texts()).toContain("msartore.dev");
 });

@@ -237,28 +237,52 @@ fn settings_modal(state: AppState, open: Signal<bool>) -> Vec<impl IntoElement> 
         .justify_center()
         .child(
             view()
-                .w(px(760.0))
-                .h(px(640.0))
+                .w(percentage(0.92))
+                .max_w(px(1080.0))
+                .h(percentage(0.88))
+                .max_h(px(760.0))
                 .flex_col()
-                .gap_3()
-                .p(px(20.0))
-                .rounded(px(14.0))
-                .bg(move || theme().card)
+                .gap(px(16.0))
+                .p(px(24.0))
+                .rounded(move || theme().radius)
+                .border_1()
+                .border_color(move || theme().border)
+                .bg(move || theme().popover)
                 .child(
                     view()
                         .flex_row()
-                        .items_center()
+                        .items_start()
+                        .justify_between()
+                        .gap_4()
                         .child(
-                            text("Settings")
-                                .text_size(px(18.0))
-                                .font_weight(FontWeight::BOLD)
-                                .flex_1(),
+                            view()
+                                .flex_col()
+                                .gap(px(2.0))
+                                .child(
+                                    text("Settings")
+                                        .text_size(px(25.0))
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(move || theme().foreground),
+                                )
+                                .child(
+                                    text("Polling, display, updates and about")
+                                        .text_size(px(12.0))
+                                        .text_color(move || theme().muted_foreground),
+                                ),
                         )
                         .child(
-                            text("Close")
-                                .text_size(px(13.0))
-                                .text_color(move || theme().primary)
-                                .on_press(move || open.set(false)),
+                            view()
+                                .px(px(12.0))
+                                .py(px(6.0))
+                                .rounded(px(7.0))
+                                .border_1()
+                                .border_color(move || theme().border)
+                                .on_press(move || open.set(false))
+                                .child(
+                                    text("Close")
+                                        .text_size(px(12.0))
+                                        .text_color(move || theme().foreground),
+                                ),
                         ),
                 )
                 .child(scroll().flex_1().child(settings::cards(state))),
