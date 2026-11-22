@@ -1,6 +1,6 @@
 {
   "name": "sudocooler",
-  "id": "io.sudocooler.app",
+  "id": "dev.msartore.sudocooler",
   "version": "0.1.7",
   "build": 8,
   "icon": "assets/logo.png",

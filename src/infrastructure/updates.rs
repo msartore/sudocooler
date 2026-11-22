@@ -10,7 +10,7 @@ use nsh_core::element::desktop::restart;
 use nsh_updater::install::Installation;
 use nsh_updater::{Config, Download, platform};
 
-const APP_ID: &str = "io.sudocooler.app";
+const APP_ID: &str = "dev.msartore.sudocooler";
 const REPOSITORY: &str = "msartore/sudocooler";
 
 fn config() -> Result<Config, String> {

@@ -22,7 +22,7 @@ fn main() -> impl std::process::Termination {
                 "/assets/icon.ico"
             ))),
             #[cfg(any(target_os = "linux", target_os = "windows"))]
-            app_id: "io.sudocooler.app".to_owned(),
+            app_id: "dev.msartore.sudocooler".to_owned(),
             size: (1120, 760),
             ..Default::default()
         },
