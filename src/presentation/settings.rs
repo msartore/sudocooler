@@ -102,6 +102,28 @@ pub fn screen(state: AppState) -> impl IntoElement {
         )
         .child(
             ui::card(
+                "Links",
+                view()
+                    .flex_col()
+                    .child(link_row(
+                        asset!("icons/brand-github.svg"),
+                        "sudocooler app",
+                        "https://github.com/msartore/sudocooler",
+                    ))
+                    .child(link_row(
+                        asset!("icons/brand-github.svg"),
+                        "sudokooler daemon",
+                        "https://github.com/BGW-10/sudokooler",
+                    ))
+                    .child(link_row(
+                        asset!("icons/world-www.svg"),
+                        "msartore.dev",
+                        "https://msartore.dev",
+                    )),
+            ),
+        )
+        .child(
+            ui::card(
                 "About",
                 view()
                     .gap_1()
@@ -116,5 +138,36 @@ pub fn screen(state: AppState) -> impl IntoElement {
                             .text_color(move || theme().muted_foreground),
                     ),
             ),
+        )
+}
+
+fn link_row(icon: nsh_core::element::ImageAsset, title: &'static str, url: &'static str) -> impl IntoElement {
+    view()
+        .flex_row()
+        .items_center()
+        .gap_3()
+        .py(px(10.0))
+        .on_press(move || {
+            let _ = open_url(url);
+        })
+        .child(
+            image(icon)
+                .size(px(16.0))
+                .tint_color(move || theme().muted_foreground),
+        )
+        .child(
+            view()
+                .flex_1()
+                .child(text(title).text_size(px(13.0)).font_weight(FontWeight::MEDIUM))
+                .child(
+                    text(url)
+                        .text_size(px(11.0))
+                        .text_color(move || theme().muted_foreground),
+                ),
+        )
+        .child(
+            image(asset!("icons/external-link.svg"))
+                .size(px(14.0))
+                .tint_color(move || theme().muted_foreground),
         )
 }

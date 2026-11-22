@@ -60,7 +60,7 @@ pub fn app() -> impl IntoElement {
         packets: signal(PacketLog::default()),
         running: signal(true),
         settings: signal(Settings::default()),
-        backend: signal("sudokooler CLI"),
+        backend: signal("sudocooler CLI"),
         error: signal(None),
         tick: signal(0_u64),
     };
@@ -193,10 +193,14 @@ fn shell(state: AppState) -> impl IntoElement {
 
 fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
     let items = [
-        (Tab::Dashboard, "Overview"),
-        (Tab::Devices, "Devices"),
-        (Tab::Packets, "Packets"),
-        (Tab::Settings, "Settings"),
+        (
+            Tab::Dashboard,
+            "Overview",
+            asset!("icons/layout-dashboard.svg"),
+        ),
+        (Tab::Devices, "Devices", asset!("icons/cpu.svg")),
+        (Tab::Packets, "Packets", asset!("icons/package.svg")),
+        (Tab::Settings, "Settings", asset!("icons/settings.svg")),
     ];
 
     let mut nav = view()
@@ -214,23 +218,26 @@ fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
                     view()
                         .gap_0p5()
                         .child(
-                            text("SUDOKOOLER")
+                            text("sudocooler")
                                 .text_size(px(15.0))
                                 .font_weight(FontWeight::BOLD)
                                 .text_color(move || theme().foreground),
                         )
                         .child(
-                            text("cooler companion")
+                            text("CPU cooler dashboard")
                                 .text_size(px(11.0))
                                 .text_color(move || theme().muted_foreground),
                         ),
                 ),
         );
 
-    for (value, label) in items {
+    for (value, label, icon) in items {
         let tab = tab;
         nav = nav.child(
             view()
+                .flex_row()
+                .items_center()
+                .gap_2()
                 .px_3()
                 .py(px(10.0))
                 .rounded(px(9.0))
@@ -242,6 +249,17 @@ fn sidebar(state: AppState, tab: Signal<Tab>) -> impl IntoElement {
                     }
                 })
                 .on_press(move || tab.set(value))
+                .child(
+                    image(icon)
+                        .size(px(17.0))
+                        .tint_color(move || {
+                            if tab.get() == value {
+                                theme().sidebar_foreground
+                            } else {
+                                theme().muted_foreground
+                            }
+                        }),
+                )
                 .child(
                     text(label)
                         .text_size(px(13.0))

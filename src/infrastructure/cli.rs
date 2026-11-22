@@ -51,6 +51,15 @@ impl CliDaemon {
                 return Ok(path.to_path_buf());
             }
         }
+        // The Scheduled Task starts the app outside the repo directory, so
+        // relative paths above are not enough for a dev build.
+        let absolute = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/sudokooler/target/debug/sudokooler.exe"
+        );
+        if Path::new(absolute).is_file() {
+            return Ok(PathBuf::from(absolute));
+        }
         Err(AppError::new(
             ErrorKind::Unavailable,
             "sudokooler binary not found; build the submodule or set SUDOKOOLER_BIN",
@@ -137,7 +146,7 @@ impl TelemetrySource for CliDaemon {
     }
 
     fn backend_name(&self) -> &'static str {
-        "sudokooler CLI"
+        "sudocooler CLI"
     }
 }
 

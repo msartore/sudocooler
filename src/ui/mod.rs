@@ -94,6 +94,7 @@ pub fn pill(label: impl Fn() -> String + 'static, tone: Tone) -> impl IntoElemen
 
 /// A compact label/value tile.
 pub fn metric(
+    icon: nsh_core::element::ImageAsset,
     label: &'static str,
     value: impl Fn() -> String + 'static,
     unit: &'static str,
@@ -106,10 +107,21 @@ pub fn metric(
         .rounded(px(12.0))
         .bg(move || theme().muted.opacity(if accent { 0.65 } else { 0.35 }))
         .child(
-            text(label)
-                .text_size(px(11.0))
-                .font_weight(FontWeight::SEMIBOLD)
-                .text_color(move || theme().muted_foreground),
+            view()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .child(
+                    image(icon)
+                        .size(px(16.0))
+                        .tint_color(move || theme().muted_foreground),
+                )
+                .child(
+                    text(label)
+                        .text_size(px(11.0))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(move || theme().muted_foreground),
+                ),
         )
         .child(
             view()
@@ -166,6 +178,57 @@ pub fn action(
                         theme().foreground
                     }
                 }),
+        )
+}
+
+/// A button with a Tabler icon beside its label.
+pub fn action_with_icon(
+    icon: nsh_core::element::ImageAsset,
+    label: impl Fn() -> String + 'static,
+    primary: bool,
+    on_press: impl Fn() + 'static,
+) -> impl IntoElement {
+    nsh_base::button()
+        .px(px(16.0))
+        .py(px(9.0))
+        .rounded(px(10.0))
+        .bg(move || {
+            if primary {
+                theme().primary
+            } else {
+                theme().secondary
+            }
+        })
+        .active(|style| style.opacity(0.7))
+        .on_press(on_press)
+        .child(
+            view()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .child(
+                    image(icon)
+                        .size(px(16.0))
+                        .tint_color(move || {
+                            if primary {
+                                theme().primary_foreground
+                            } else {
+                                theme().foreground
+                            }
+                        }),
+                )
+                .child(
+                    text(label)
+                        .text_size(px(13.0))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(move || {
+                            if primary {
+                                theme().primary_foreground
+                            } else {
+                                theme().foreground
+                            }
+                        }),
+                ),
         )
 }
 

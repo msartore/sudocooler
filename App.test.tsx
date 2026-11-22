@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 test("sudocooler renders its dashboard", async () => {
   const app = await open(".");
-  expect(app.texts()).toContain("SUDOKOOLER");
+  expect(app.texts()).toContain("sudocooler");
   expect(app.texts()).toContain("Overview");
   expect(app.texts()).toContain("CPU PACKAGE TEMPERATURE");
 });

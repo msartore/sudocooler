@@ -38,24 +38,28 @@ pub fn screen(state: AppState) -> impl IntoElement {
                         .grid_cols(2)
                         .gap_3()
                         .child(ui::metric(
+                            asset!("icons/temperature.svg"),
                             "Temperature",
                             move || format!("{:.1}", state.telemetry.get().temperature_c),
                             "C",
                             true,
                         ))
                         .child(ui::metric(
+                            asset!("icons/bolt.svg"),
                             "Package power",
                             move || state.telemetry.get().power_w.to_string(),
                             "W",
                             false,
                         ))
                         .child(ui::metric(
+                            asset!("icons/activity.svg"),
                             "CPU load",
                             move || state.telemetry.get().usage_pct.to_string(),
                             "%",
                             false,
                         ))
                         .child(ui::metric(
+                            asset!("icons/clock.svg"),
                             "Core clock",
                             move || state.telemetry.get().frequency_mhz.to_string(),
                             "MHz",
@@ -69,19 +73,28 @@ pub fn screen(state: AppState) -> impl IntoElement {
                 .flex_wrap()
                 .gap_2()
                 .child(
-                    ui::action(
+                    when(
+                        move || state.running.get(),
                         move || {
-                            if state.running.get() {
-                                "Pause".to_owned()
-                            } else {
-                                "Resume".to_owned()
-                            }
+                            ui::action_with_icon(
+                                asset!("icons/player-pause.svg"),
+                                || "Pause".to_owned(),
+                                true,
+                                move || state.running.update(|running| *running = !*running),
+                            )
                         },
-                        true,
-                        move || state.running.update(|running| *running = !*running),
-                    ),
+                    )
+                    .otherwise(move || {
+                        ui::action_with_icon(
+                            asset!("icons/player-play.svg"),
+                            || "Resume".to_owned(),
+                            true,
+                            move || state.running.update(|running| *running = !*running),
+                        )
+                    }),
                 )
-                .child(ui::action(
+                .child(ui::action_with_icon(
+                    asset!("icons/refresh.svg"),
                     || "Rescan devices".to_owned(),
                     false,
                     move || rescan(state),
