@@ -4,7 +4,7 @@ use nsh_base::theme;
 use nsh_core::prelude::*;
 
 use super::{AppState, header, rescan};
-use crate::ui::{self, Tone};
+use crate::ui;
 
 pub fn screen(state: AppState) -> impl IntoElement {
     view()
@@ -15,36 +15,6 @@ pub fn screen(state: AppState) -> impl IntoElement {
             "Overview",
             "Live CPU telemetry and the frame sent to the cooler display.",
         ))
-        .child(
-            view()
-                .flex_row()
-                .flex_wrap()
-                .gap_2()
-                .child(
-                    ui::pill(
-                        move || {
-                            if state.running.get() {
-                                "Streaming".to_owned()
-                            } else {
-                                "Paused".to_owned()
-                            }
-                        },
-                        if state.running.get() {
-                            Tone::Success
-                        } else {
-                            Tone::Neutral
-                        },
-                    ),
-                )
-                .child(ui::pill(
-                    move || state.backend.get().to_owned(),
-                    Tone::Neutral,
-                ))
-                .child(ui::pill(
-                    move || format!("{} ms", state.settings.get().interval_ms),
-                    Tone::Neutral,
-                )),
-        )
         .child(error_banner(state))
         .child(unsupported_notice(state))
         .child(
