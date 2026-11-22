@@ -16,8 +16,6 @@ keeps its own build, tests and hardware safety rules.
 
 ![sudocooler overview](docs/screenshots/overview.png)
 
-![sudocooler settings](docs/screenshots/settings.png)
-
 > The daemon's own name and paths keep the upstream `sudokooler` spelling.
 
 ## Supported hardware
