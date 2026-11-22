@@ -10,8 +10,8 @@ use nsh_base::theme;
 use nsh_core::desktop::WindowAttributes;
 use nsh_core::element::desktop::{MenuItem, current_window, set_tray, tray};
 use nsh_core::prelude::*;
+use nsh_core::storage::Storage;
 
-use crate::application::use_cases::{PacketEntry, PacketLog};
 use crate::composition::{self, AppDeps};
 use crate::domain::device::Device;
 use crate::domain::settings::Settings;
@@ -21,13 +21,45 @@ use crate::ui;
 /// Profile default from `profiles/default_devices.toml`.
 const POWER_BAR_MAX_W: u16 = 160;
 
+const KEY_INTERVAL: &str = "settings.interval_ms";
+const KEY_UNIT: &str = "settings.temp_unit";
+
+/// Loads persisted settings, falling back to defaults for anything missing or
+/// invalid (so a corrupt value never stops the app from starting).
+fn load_settings() -> Settings {
+    let mut settings = Settings::default();
+    if let Some(interval) = Storage::get_item(KEY_INTERVAL).and_then(|v| v.parse::<u32>().ok())
+        && let Ok(next) = settings.clone().with_interval(interval)
+    {
+        settings = next;
+    }
+    if let Some(unit) = Storage::get_item(KEY_UNIT) {
+        let unit = match unit.as_str() {
+            "fahrenheit" => crate::domain::packet::TempUnit::Fahrenheit,
+            _ => crate::domain::packet::TempUnit::Celsius,
+        };
+        settings = settings.with_temp_unit(unit);
+    }
+    settings
+}
+
+fn save_settings(settings: &Settings) {
+    let _ = Storage::set_item(KEY_INTERVAL, settings.interval_ms.to_string());
+    let unit = match settings.temp_unit {
+        crate::domain::packet::TempUnit::Celsius => "celsius",
+        crate::domain::packet::TempUnit::Fahrenheit => "fahrenheit",
+    };
+    let _ = Storage::set_item(KEY_UNIT, unit);
+}
+
 /// All state the screens share. Signals are `Copy` handles, so screens get a
 /// cheap snapshot of the app without owning a global singleton.
 #[derive(Clone, Copy)]
 pub struct AppState {
     pub telemetry: Signal<Telemetry>,
+    /// Whether a real sample has landed yet; until then the UI shows dashes.
+    pub sampled: Signal<bool>,
     pub devices: Signal<Vec<Device>>,
-    pub packets: Signal<PacketLog>,
     pub running: Signal<bool>,
     pub settings: Signal<Settings>,
     pub backend: Signal<&'static str>,
@@ -41,32 +73,50 @@ pub struct AppState {
     pub autostart: Signal<bool>,
     /// Heartbeat counter, used to pace sampling at the configured interval.
     pub tick: Signal<u64>,
+    /// True while a sample is in flight, so ticks never pile up.
+    pub sampling: Signal<bool>,
 }
 
 impl AppState {
     pub fn power_bar_pct(&self) -> u8 {
         self.telemetry.get().power_bar_pct(POWER_BAR_MAX_W)
     }
+
+    /// The temperature in the unit the cooler is set to display.
+    pub fn temperature_in_unit(&self) -> f32 {
+        let celsius = self.telemetry.get().temperature_c;
+        match self.settings.get().temp_unit {
+            crate::domain::packet::TempUnit::Celsius => celsius,
+            crate::domain::packet::TempUnit::Fahrenheit => celsius * 9.0 / 5.0 + 32.0,
+        }
+    }
+
+    /// `"C"` or `"F"`, matching [`Self::temperature_in_unit`].
+    pub fn unit_label(&self) -> &'static str {
+        self.settings.get().temp_unit.label()
+    }
 }
 
 /// Root mounted by `nsh.json` and `cargo run`.
 pub fn app() -> impl IntoElement {
-    let initial = Telemetry::new(47.0, 16, 40, 5025).expect("valid initial sample");
+    // No fabricated readings: the UI shows dashes until the first real sample.
+    let initial = Telemetry::new(0.0, 0, 0, 0).expect("valid zero sample");
     let state = AppState {
         telemetry: signal(initial),
+        sampled: signal(false),
         // Do not block the first frame on the OS HID scan: on Windows it shells
         // out to PowerShell, which can take several seconds on a cold start.
         // The real scan runs off-thread just below and fills this in.
         devices: signal(Vec::new()),
-        packets: signal(PacketLog::default()),
         running: signal(true),
-        settings: signal(Settings::default()),
+        settings: signal(load_settings()),
         backend: signal("sudocooler CLI"),
         error: signal(None),
         update_status: signal("Not checked".to_owned()),
         sensor_notice: signal(None),
-        autostart: signal(composition::autostart_enabled()),
+        autostart: signal(false),
         tick: signal(0_u64),
+        sampling: signal(false),
     };
 
     provide_context(AppDeps::new());
@@ -78,6 +128,21 @@ pub fn app() -> impl IntoElement {
         if let Ok(devices) = blocking(composition::discover).await {
             state.devices.set(devices);
         }
+    });
+
+    // Read the logon-autostart state off-thread too (Windows runs reg.exe).
+    spawn(async move {
+        if let Ok(enabled) = blocking(composition::autostart_enabled).await {
+            state.autostart.set(enabled);
+        }
+    });
+
+    // Persist settings whenever they change, so polling and unit survive a
+    // restart.
+    let settings_to_save = state.settings;
+    effect(move || {
+        let settings = settings_to_save.get();
+        save_settings(&settings);
     });
 
     // Closing the window hides it into the tray; the Quit tray item exits.
@@ -111,65 +176,65 @@ pub fn app() -> impl IntoElement {
         );
     });
 
-    // A 100 ms heartbeat; sampling happens only when the configured interval
-    // has elapsed. Tasks and timers end with the view that created them.
+    // A 100 ms heartbeat. Sampling runs on a blocking thread so spawning the
+    // daemon process never stalls the UI; `sampling` keeps ticks from piling up
+    // while a sample is in flight.
     set_interval(Duration::from_millis(100), move || {
         let tick = state.tick.get() + 1;
         state.tick.set(tick);
-        if !state.running.get() {
+        if !state.running.get() || state.sampling.get() {
             return;
         }
         let settings = state.settings.get();
-        let period = (settings.interval_ms / 100).max(1) as u64;
-        if !tick.is_multiple_of(period) {
+        // Round the interval up to the heartbeat's 100 ms grid, so we never
+        // sample faster than requested.
+        let period = u64::from(settings.interval_ms.max(100)).div_ceil(100);
+        if !(tick - 1).is_multiple_of(period) {
             return;
         }
-        match composition::sample(settings.config_path.as_deref()) {
-            Ok(result) => {
-                batch(|| {
+        let config = settings.config_path.clone();
+        let unit = settings.temp_unit;
+        let is_l120 = state
+            .devices
+            .get()
+            .iter()
+            .any(|device| device.pid == 0x0005 && device.connected);
+
+        state.sampling.set(true);
+        spawn(async move {
+            let outcome = blocking(move || {
+                let sample = composition::sample(config.as_deref());
+                let write_error = match (&sample, is_l120) {
+                    (Ok(result), true) => composition::write_l120(&result.telemetry, unit).err(),
+                    _ => None,
+                };
+                (sample, write_error)
+            })
+            .await;
+
+            match outcome {
+                Ok((Ok(result), write_error)) => batch(|| {
                     state.telemetry.set(result.telemetry);
+                    state.sampled.set(true);
                     state.backend.set(result.backend);
                     state.sensor_notice.set(result.notice);
-                    state.error.set(None);
-                    state.packets.update(|log| {
-                        let sequence = log.latest().map_or(1, |entry| entry.sequence + 1);
-                        let is_l120 = state
-                            .devices
-                            .get()
-                            .iter()
-                            .any(|device| device.pid == 0x0005 && device.connected);
-                        log.push(if is_l120 {
-                            PacketEntry::from_l120_sample(
-                                sequence,
-                                &result.telemetry,
-                                settings.temp_unit,
-                            )
-                        } else {
-                            PacketEntry::from_sample(
-                                sequence,
-                                &result.telemetry,
-                                &settings,
-                                POWER_BAR_MAX_W,
-                            )
-                        });
-                    });
-                });
-
-                if state
-                    .devices
-                    .get()
-                    .iter()
-                    .any(|device| device.pid == 0x0005 && device.connected)
-                    && let Err(error) =
-                        composition::write_l120(&result.telemetry, settings.temp_unit)
-                {
-                    state.error.set(Some(format!("L120 write: {error}")));
+                    state
+                        .error
+                        .set(write_error.map(|error| format!("L120 write: {error}")));
+                }),
+                Ok((Err(error), _)) => {
+                    state.sensor_notice.set(None);
+                    state.error.set(Some(error.message));
+                }
+                Err(_) => {
+                    state.sensor_notice.set(None);
+                    state
+                        .error
+                        .set(Some("telemetry sampling failed".to_owned()));
                 }
             }
-            Err(error) => {
-                state.error.set(Some(error.message));
-            }
-        }
+            state.sampling.set(false);
+        });
     });
 
     view()
@@ -180,10 +245,15 @@ pub fn app() -> impl IntoElement {
         .child(shell(state))
 }
 
-/// Rescan devices in the active adapter and publish the result.
+/// Rescan devices in the active adapter and publish the result. The scan
+/// shells out on Windows, so it runs off the UI thread.
 pub fn rescan(state: AppState) {
-    state.devices.set(composition::discover());
-    state.error.set(None);
+    spawn(async move {
+        if let Ok(devices) = blocking(composition::discover).await {
+            state.devices.set(devices);
+            state.error.set(None);
+        }
+    });
 }
 
 fn shell(state: AppState) -> impl IntoElement {

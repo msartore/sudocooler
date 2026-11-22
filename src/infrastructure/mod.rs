@@ -2,7 +2,6 @@
 
 pub mod autostart;
 pub mod cli;
-pub mod demo;
 pub mod hid_writer;
 pub mod system;
 pub mod updates;

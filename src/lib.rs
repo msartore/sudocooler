@@ -2,8 +2,9 @@
 //!
 //! Layers, from the inside out:
 //! `domain` (std only) → `application` (ports/use cases) → `infrastructure`
-//! (daemon CLI + demo adapters) → `composition` (wiring) → `presentation`
-//! and `ui` (the only consumers of NSH).
+//! (daemon CLI, OS adapters) → `composition` (wiring) → `presentation`
+//! and `ui` (the only consumers of NSH). There is no demo mode: readings
+//! always come from the real daemon.
 
 pub mod application;
 pub mod composition;

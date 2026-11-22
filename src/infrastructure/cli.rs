@@ -139,7 +139,7 @@ impl CliDaemon {
         let notice = stderr
             .lines()
             .find(|line| line.contains("[sensors]"))
-            .map(str::to_owned);
+            .map(|line| line.replace("[sensors] ", "").trim().to_owned());
         *self.notice.borrow_mut() = notice;
         if !stderr.trim().is_empty() {
             combined.push_str(&stderr);

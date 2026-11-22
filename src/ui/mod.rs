@@ -266,7 +266,7 @@ pub fn metric(
     icon: nsh_core::element::ImageAsset,
     label: &'static str,
     value: impl Fn() -> String + 'static,
-    unit: &'static str,
+    unit: impl Fn() -> &'static str + 'static,
     accent: bool,
 ) -> impl IntoElement {
     view()
@@ -486,6 +486,7 @@ pub fn segment_digit(digit: impl Fn() -> Option<u8> + Clone + 'static) -> impl I
 pub fn segment_display(
     temperature: impl Fn() -> f32 + Clone + 'static,
     bar: impl Fn() -> u8 + Clone + 'static,
+    unit: impl Fn() -> &'static str + Clone + 'static,
 ) -> impl IntoElement {
     let for_tens = temperature.clone();
     let for_ones = temperature.clone();
@@ -502,6 +503,7 @@ pub fn segment_display(
         let value = for_tenths().clamp(0.0, 99.9);
         Some((((value * 10.0) as usize) % 10) as u8)
     };
+    let unit_label = unit.clone();
 
     view()
         .flex_col()
@@ -527,7 +529,7 @@ pub fn segment_display(
                 )
                 .child(segment_digit(tenths))
                 .child(
-                    text("C")
+                    text(unit_label)
                         .text_size(px(20.0))
                         .font_weight(FontWeight::BOLD)
                         .text_color(display_on),

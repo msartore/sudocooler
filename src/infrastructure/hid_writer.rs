@@ -64,21 +64,31 @@ pub fn open() -> Result<(), String> {
 pub fn write_sample(sample: &Telemetry, unit: TempUnit) -> Result<usize, String> {
     open()?;
     let mut guard = slot().lock().map_err(|e| e.to_string())?;
-    let Some(connection) = guard.as_mut() else {
-        return Err("cooler is not connected".to_owned());
-    };
-    if !OPENED.swap(true, Ordering::SeqCst) {
+    let result = (|| -> Result<usize, String> {
+        let connection = guard
+            .as_mut()
+            .ok_or_else(|| "cooler is not connected".to_owned())?;
+        if !OPENED.swap(true, Ordering::SeqCst) {
+            connection
+                .device
+                .write(&encode_l120_display_open())
+                .map_err(|e| format!("L120 display-open write failed: {e}"))?;
+        }
+        let frame = encode_l120_packet(sample, unit);
         connection
             .device
-            .write(&encode_l120_display_open())
-            .map_err(|e| format!("L120 display-open write failed: {e}"))?;
+            .write(&frame)
+            .map_err(|e| format!("L120 telemetry write failed: {e}"))?;
+        Ok(frame.len())
+    })();
+
+    if result.is_err() {
+        // Drop the stale handle so the next tick reopens the device and
+        // re-sends the display-open frame after an unplug/replug.
+        OPENED.store(false, Ordering::SeqCst);
+        *guard = None;
     }
-    let frame = encode_l120_packet(sample, unit);
-    connection
-        .device
-        .write(&frame)
-        .map_err(|e| format!("L120 telemetry write failed: {e}"))?;
-    Ok(frame.len())
+    result
 }
 
 /// Sends the display-off command and releases the handle.

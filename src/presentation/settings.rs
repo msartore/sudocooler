@@ -97,13 +97,20 @@ fn daemon_panel(state: AppState) -> impl IntoElement {
                 "Start at login",
                 "Launch sudocooler when you sign in",
                 move |_| {
-                    // Flip immediately for instant feedback; the registry write runs
-                    // off-thread so the UI never waits on reg.exe.
+                    // Flip immediately for instant feedback; the logon entry is
+                    // written off-thread so the UI never waits on schtasks/reg.
                     let next = !state.autostart.get();
                     state.autostart.set(next);
                     spawn(async move {
-                        if composition::set_autostart(next).is_err() {
-                            state.autostart.set(composition::autostart_enabled());
+                        let outcome = blocking(move || {
+                            let result = composition::set_autostart(next);
+                            // Re-read the real state either way.
+                            (result, composition::autostart_enabled())
+                        })
+                        .await;
+                        if let Ok((Err(error), enabled)) = outcome {
+                            state.autostart.set(enabled);
+                            state.error.set(Some(format!("Start at login: {error}")));
                         }
                     });
                 },
@@ -180,9 +187,10 @@ fn updates_panel(state: AppState) -> impl IntoElement {
                         move || {
                             let status = state.update_status;
                             spawn(async move {
-                                let message = match composition::check_update() {
-                                    Ok(message) => message,
-                                    Err(error) => format!("Check failed: {error}"),
+                                let message = match blocking(composition::check_update).await {
+                                    Ok(Ok(message)) => message,
+                                    Ok(Err(error)) => format!("Check failed: {error}"),
+                                    Err(_) => "Check failed".to_owned(),
                                 };
                                 status.set(message);
                             });
@@ -194,9 +202,10 @@ fn updates_panel(state: AppState) -> impl IntoElement {
                         move || {
                             let status = state.update_status;
                             spawn(async move {
-                                let message = match composition::install_update() {
-                                    Ok(message) => message,
-                                    Err(error) => format!("Install failed: {error}"),
+                                let message = match blocking(composition::install_update).await {
+                                    Ok(Ok(message)) => message,
+                                    Ok(Err(error)) => format!("Install failed: {error}"),
+                                    Err(_) => "Install failed".to_owned(),
                                 };
                                 status.set(message);
                             });

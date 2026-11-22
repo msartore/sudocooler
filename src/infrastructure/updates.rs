@@ -72,22 +72,33 @@ pub fn install() -> Result<String, String> {
         .map_err(|error| error.to_string())?;
     download.finish().map_err(|error| error.to_string())?;
 
-    let path = std::env::temp_dir().join("sudocooler-update.zip");
-    std::fs::write(&path, &archive).map_err(|error| error.to_string())?;
+    // Only a packaged app (one carrying NSH's updater config beside the
+    // runner) can be replaced in place; a development build must not be.
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let root = executable
         .parent()
         .ok_or_else(|| "cannot find the app directory".to_owned())?;
-    let installation = Installation::directory(root, &executable)
-        .ok_or_else(|| "this build cannot be updated in place".to_owned())?;
+    let config_asset = root
+        .join("nsh")
+        .join("assets")
+        .join(nsh_updater::CONFIG_ASSET);
+    let config_bytes = std::fs::read(&config_asset)
+        .map_err(|_| "updates need the packaged app; use the setup installer".to_owned())?;
+    let installation = Installation::current(APP_ID, &config_bytes)
+        .ok_or_else(|| "updates need the packaged app; use the setup installer".to_owned())?;
     if !installation.can_install() {
         return Err(
             "the app is installed where it cannot be replaced; use the setup installer".to_owned(),
         );
     }
-    installation
+
+    let path = std::env::temp_dir().join(format!("sudocooler-update-{}.zip", std::process::id()));
+    std::fs::write(&path, &archive).map_err(|error| error.to_string())?;
+    let result = installation
         .install(&path)
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| error.to_string());
+    let _ = std::fs::remove_file(&path);
+    result?;
     restart();
     Ok(format!("installed v{}", available.version))
 }

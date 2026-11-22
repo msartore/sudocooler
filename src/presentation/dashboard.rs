@@ -4,6 +4,7 @@ use nsh_base::theme;
 use nsh_core::prelude::*;
 
 use super::{AppState, header, rescan};
+use crate::domain::device::Protocol;
 use crate::ui;
 
 pub fn screen(state: AppState) -> impl IntoElement {
@@ -26,8 +27,9 @@ pub fn screen(state: AppState) -> impl IntoElement {
                 .child(ui::card(
                     "Cooler display preview",
                     ui::segment_display(
-                        move || state.telemetry.get().temperature_c,
+                        move || state.temperature_in_unit(),
                         move || state.power_bar_pct(),
+                        move || state.unit_label(),
                     ),
                 ))
                 .child(
@@ -39,29 +41,53 @@ pub fn screen(state: AppState) -> impl IntoElement {
                         .child(ui::metric(
                             asset!("icons/temperature.svg"),
                             "Temperature",
-                            move || format!("{:.1}", state.telemetry.get().temperature_c),
-                            "C",
+                            move || {
+                                if state.sampled.get() {
+                                    format!("{:.1}", state.temperature_in_unit())
+                                } else {
+                                    "—".to_owned()
+                                }
+                            },
+                            move || state.unit_label(),
                             true,
                         ))
                         .child(ui::metric(
                             asset!("icons/bolt.svg"),
                             "Package power",
-                            move || state.telemetry.get().power_w.to_string(),
-                            "W",
+                            move || {
+                                if state.sampled.get() {
+                                    state.telemetry.get().power_w.to_string()
+                                } else {
+                                    "—".to_owned()
+                                }
+                            },
+                            || "W",
                             false,
                         ))
                         .child(ui::metric(
                             asset!("icons/activity.svg"),
                             "CPU load",
-                            move || state.telemetry.get().usage_pct.to_string(),
-                            "%",
+                            move || {
+                                if state.sampled.get() {
+                                    state.telemetry.get().usage_pct.to_string()
+                                } else {
+                                    "—".to_owned()
+                                }
+                            },
+                            || "%",
                             false,
                         ))
                         .child(ui::metric(
                             asset!("icons/clock.svg"),
                             "Core clock",
-                            move || state.telemetry.get().frequency_mhz.to_string(),
-                            "MHz",
+                            move || {
+                                if state.sampled.get() {
+                                    state.telemetry.get().frequency_mhz.to_string()
+                                } else {
+                                    "—".to_owned()
+                                }
+                            },
+                            || "MHz",
                             false,
                         )),
                 ),
@@ -106,7 +132,7 @@ fn sensor_notice(state: AppState) -> impl IntoElement {
     when(
         move || {
             let sample = state.telemetry.get();
-            sample.temperature_c == 0.0 && sample.power_w == 0
+            state.sampled.get() && sample.temperature_c == 0.0 && sample.power_w == 0
         },
         move || {
             view()
@@ -132,7 +158,7 @@ fn sensor_notice(state: AppState) -> impl IntoElement {
     )
 }
 
-/// Shown when a detected device is outside the daemon's verified profile set.
+/// Shown for a detected cooler outside the daemon's verified profile set.
 fn unsupported_notice(state: AppState) -> impl IntoElement {
     when(
         move || {
@@ -148,9 +174,31 @@ fn unsupported_notice(state: AppState) -> impl IntoElement {
                 .rounded(px(10.0))
                 .bg(move || theme().muted.opacity(0.45))
                 .child(
-                    text("ENERGLO 360 detected (PID 381C:0005). The seven-segment preview emulates SK700V; live L120 frames are streamed to your cooler automatically.")
-                        .text_size(px(12.0))
-                        .text_color(move || theme().foreground),
+                    text(move || {
+                        state
+                            .devices
+                            .get()
+                            .iter()
+                            .find(|device| device.connected && !device.enabled)
+                            .map(|device| {
+                                if device.protocol == Protocol::L120 {
+                                    format!(
+                                        "{} detected ({}). Live L120 frames are streamed to your cooler automatically; the preview uses the SK700V seven-segment layout.",
+                                        device.name,
+                                        device.id()
+                                    )
+                                } else {
+                                    format!(
+                                        "{} detected ({}). This model is not yet verified, so it stays read-only until the daemon supports it.",
+                                        device.name,
+                                        device.id()
+                                    )
+                                }
+                            })
+                            .unwrap_or_default()
+                    })
+                    .text_size(px(12.0))
+                    .text_color(move || theme().foreground),
                 )
         },
     )
