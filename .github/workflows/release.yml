@@ -50,6 +50,11 @@ jobs:
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\build-release.ps1
 
+      - name: Write update manifest
+        shell: pwsh
+        run: |
+          nsh update-manifest dist\sudocooler-*-windows-x86_64.zip --entry . --base-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" -o dist
+
       - name: Name artifacts and write checksums
         shell: pwsh
         run: |
@@ -57,9 +62,12 @@ jobs:
           Move-Item -LiteralPath dist\sudocooler-portable.zip -Destination "dist\$zip"
           $setup = "sudocooler-$env:GITHUB_REF_NAME-setup.exe"
           Move-Item -LiteralPath dist\sudocooler-setup.exe -Destination "dist\$setup"
-          $zipHash = (Get-FileHash -LiteralPath "dist\$zip" -Algorithm SHA256).Hash.ToLowerInvariant()
-          $setupHash = (Get-FileHash -LiteralPath "dist\$setup" -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$zipHash  $zip`n$setupHash  $setup" | Out-File -FilePath dist\SHA256SUMS.txt -Encoding ascii
+          $files = @(Get-ChildItem -LiteralPath dist -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' })
+          $lines = $files | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          }
+          $lines -join "`n" | Out-File -FilePath dist\SHA256SUMS.txt -Encoding ascii
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -67,5 +75,7 @@ jobs:
           files: |
             dist/sudocooler-*-portable.zip
             dist/sudocooler-*-setup.exe
+            dist/sudocooler-*-windows-x86_64.zip
+            dist/latest.json
             dist/SHA256SUMS.txt
           fail_on_unmatched_files: true

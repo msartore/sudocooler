@@ -183,6 +183,12 @@ try {
         }
         finally { Pop-Location }
         $AppPackageDir = Join-Path $packageOut 'sudocooler'
+
+        # Keep the NSH package archive under the name nsh update-manifest needs.
+        $appVersion = (Get-Content -LiteralPath (Join-Path $repoRoot 'nsh.json') -Raw | ConvertFrom-Json).version
+        $updateZip = Join-Path $OutDir "sudocooler-$appVersion-windows-x86_64.zip"
+        Copy-Item -LiteralPath (Join-Path $packageOut 'sudocooler.zip') -Destination $updateZip -Force
+        Write-Detail "Update archive: $updateZip"
     }
     else {
         Write-Step '[1/4] Using the supplied app package directory (skipping nsh build/package).'
