@@ -53,9 +53,21 @@ jobs:
       - name: Daemon tests
         run: cargo test --manifest-path sudokooler/Cargo.toml
 
-      - name: Build portable release
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build portable release and setup
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\build-release.ps1
+
+      - name: Upload setup executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: sudocooler-setup
+          path: dist/sudocooler-setup.exe
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload portable package
         uses: actions/upload-artifact@v4

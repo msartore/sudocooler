@@ -42,22 +42,30 @@ jobs:
           irm https://nsh.dev/install.ps1 | iex
           "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Build portable release
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build portable release and setup
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\build-release.ps1
 
-      - name: Name artifact and write checksum
+      - name: Name artifacts and write checksums
         shell: pwsh
         run: |
           $zip = "sudocooler-$env:GITHUB_REF_NAME-portable.zip"
           Move-Item -LiteralPath dist\sudocooler-portable.zip -Destination "dist\$zip"
-          $hash = (Get-FileHash -LiteralPath "dist\$zip" -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $zip" | Out-File -FilePath dist\SHA256SUMS.txt -Encoding ascii
+          $setup = "sudocooler-$env:GITHUB_REF_NAME-setup.exe"
+          Move-Item -LiteralPath dist\sudocooler-setup.exe -Destination "dist\$setup"
+          $zipHash = (Get-FileHash -LiteralPath "dist\$zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash -LiteralPath "dist\$setup" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$zipHash  $zip`n$setupHash  $setup" | Out-File -FilePath dist\SHA256SUMS.txt -Encoding ascii
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/sudocooler-*-portable.zip
+            dist/sudocooler-*-setup.exe
             dist/SHA256SUMS.txt
           fail_on_unmatched_files: true
