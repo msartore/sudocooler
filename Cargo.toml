@@ -1,6 +1,6 @@
 [package]
 name = "sudocooler"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 description = "Native app for Sudokoo CPU coolers, built with NSH"
 license = "GPL-3.0"
@@ -27,7 +27,7 @@ nsh-platform-macos = { version = "0.5.0", default-features = false, features = [
 [target.'cfg(target_os = "windows")'.dependencies]
 nsh-platform-windows = { version = "0.5.0", default-features = false, features = ["shader", "editor", "emoji-picker", "highlight", "math", "plot", "rich-editor", "term"] }
 
-[build-dependencies]
+[target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
 
 [dev-dependencies]
