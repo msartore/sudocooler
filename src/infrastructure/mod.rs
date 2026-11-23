@@ -2,6 +2,7 @@
 
 pub mod autostart;
 pub mod cli;
+pub mod elevation;
 pub mod hid_writer;
 pub mod pawnio;
 pub mod system;

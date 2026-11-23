@@ -8,10 +8,10 @@
 
     * Copies the app + daemon into $env:LOCALAPPDATA\Programs\sudocooler (no admin).
     * Creates a Start Menu shortcut.
-    * Registers the same elevated ONLOGON Scheduled Task the app itself uses
-      ("Start at login"), so the in-app toggle can keep managing it.
+    * Removes a Scheduled Task an older build registered at logon (start at
+      login is now a per-user entry the app manages, unelevated).
     * Sets the per-user SUDOKOOLER_BIN variable so the app can always find the
-      daemon when the task starts it outside the repository directory.
+      daemon when it is started from another working directory.
     * Installs PawnIO ONLY if it is missing AND -InstallPawnIO is supplied.
       The bundled installer (installer\PawnIO_setup.exe) is used when present;
       otherwise it is downloaded to a temporary folder. The driver installer may
@@ -208,8 +208,8 @@ else {
     Write-Host '    Skipped (WhatIf/Confirm).'
 }
 
-# The app looks here first for the daemon. The Scheduled Task starts the app
-# with System32 as its working directory, so a relative path is not reliable.
+# The app looks here first for the daemon. A launcher may start it with
+# System32 as its working directory, so a relative path is not reliable.
 if ($PSCmdlet.ShouldProcess('SUDOKOOLER_BIN', "Set the per-user daemon path to '$daemonExe'")) {
     [Environment]::SetEnvironmentVariable('SUDOKOOLER_BIN', $daemonExe, 'User')
     $env:SUDOKOOLER_BIN = $daemonExe
@@ -229,7 +229,10 @@ else {
     if ($PSCmdlet.ShouldProcess($shortcutPath, 'Create/refresh the Start Menu shortcut')) {
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($shortcutPath)
-        $shortcut.TargetPath = $appExe
+        # PawnIO needs elevation; the VBScript ShellExecutes with "runas" so
+        # the UAC prompt appears directly and no console flashes.
+        $shortcut.TargetPath = Join-Path $env:WINDIR 'System32\wscript.exe'
+        $shortcut.Arguments = """" + (Join-Path $InstallDir 'launch-elevated.vbs') + """"
         $shortcut.WorkingDirectory = $InstallDir
         $shortcut.IconLocation = "$appExe,0"
         $shortcut.Description = 'sudocooler - Sudokoo CPU cooler dashboard'
@@ -239,18 +242,29 @@ else {
 }
 
 # ---------------------------------------------------------------------------
-# 5. Elevated ONLOGON Scheduled Task (same command the app's toggle uses)
+# 5. Elevated ONLOGON Scheduled Task (same task the app's toggle manages)
 # ---------------------------------------------------------------------------
 if ($SkipTask) {
     Write-Step '[5/5] Skipping Scheduled Task registration (-SkipTask).'
 }
 else {
-    Write-Step "[5/5] Registering elevated ONLOGON Scheduled Task '$TaskName' ..."
-    $tr = '"' + $appExe + '"'
-    $schtasksArgs = @('/Create', '/TN', $TaskName, '/TR', $tr, '/SC', 'ONLOGON', '/RL', 'HIGHEST', '/F')
+    Write-Step "[5/5] Registering the elevated ONLOGON Scheduled Task '$TaskName' ..."
     if ($PSCmdlet.ShouldProcess("Scheduled Task '$TaskName'", 'Register elevated logon task')) {
-        Invoke-NativeChecked -FilePath 'schtasks.exe' -Arguments $schtasksArgs -Description 'schtasks /Create'
-        Write-Host '    The app will start elevated at the next logon (or use the Start Menu shortcut now).'
+        $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
+        if (-not $isAdmin) {
+            Write-Warning 'Registering the elevated logon task needs administrator rights; run this script from an elevated prompt, or enable Start at login from the app (launched through the shortcut).'
+        }
+        else {
+            $register = Join-Path $sourceDir 'register-task.ps1'
+            if (-not (Test-Path -LiteralPath $register)) {
+                throw "'$register' is missing; re-extract the portable package."
+            }
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $register -Exe $appExe -TaskName $TaskName
+            if ($LASTEXITCODE -ne 0) {
+                throw "Registering the logon task failed with exit code $LASTEXITCODE."
+            }
+        }
     }
 }
 

@@ -164,6 +164,16 @@ fn sensor_notice(state: AppState) -> impl IntoElement {
                     .text_size(px(12.0))
                     .text_color(move || theme().foreground),
                 )
+                .child(when(
+                    move || matches!(state.pawnio.get(), Some(crate::application::PawnIoStatus::Denied)),
+                    move || {
+                        ui::action(
+                            || "Restart as administrator".to_owned(),
+                            true,
+                            move || crate::presentation::request_admin(state),
+                        )
+                    },
+                ))
         },
     )
 }

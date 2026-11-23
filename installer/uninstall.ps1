@@ -9,7 +9,8 @@
     Or run this script with -InstallDir pointing at the folder to remove.
 
     Removes:
-      * the elevated ONLOGON Scheduled Task "sudocooler",
+      * the per-user Run entry "sudocooler" (start at login),
+      * the elevated ONLOGON Scheduled Task older builds registered,
       * the Start Menu shortcut,
       * the per-user SUDOKOOLER_BIN variable (only if it points into the install folder),
       * the install folder itself (after stopping only the installed processes).
@@ -38,6 +39,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $TaskName = 'sudocooler'
+$RunValueName = 'sudocooler'
+$RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 
 function Write-Step {
     param([Parameter(Mandatory)][string]$Message)
@@ -79,10 +82,20 @@ $InstallDir = [System.IO.Path]::GetFullPath($InstallDir)
 Write-Host "Install folder: $InstallDir"
 
 # ---------------------------------------------------------------------------
-# 1. Scheduled Task (the app's disable() uses the same schtasks command)
+# 1. Logon entries: the per-user Run value and an older elevated task
 # ---------------------------------------------------------------------------
-Write-Step '[1/4] Removing the Scheduled Task ...'
-if ($PSCmdlet.ShouldProcess("Scheduled Task '$TaskName'", 'Delete logon task')) {
+Write-Step '[1/4] Removing the logon entry ...'
+if ($PSCmdlet.ShouldProcess("HKCU Run value '$RunValueName'", 'Delete the per-user logon entry')) {
+    if (Get-ItemProperty -Path $RunKey -Name $RunValueName -ErrorAction SilentlyContinue) {
+        Remove-ItemProperty -Path $RunKey -Name $RunValueName -Force
+        Write-Host "    Removed HKCU Run value '$RunValueName'."
+    }
+    else {
+        Write-Host '    No per-user logon entry.'
+    }
+}
+# Older builds: a Scheduled Task at RunLevel Highest (needs admin to delete).
+if ($PSCmdlet.ShouldProcess("Scheduled Task '$TaskName'", 'Delete the legacy logon task')) {
     Invoke-NativeChecked -FilePath 'schtasks.exe' -Arguments @('/Delete', '/TN', $TaskName, '/F') -Description 'schtasks /Delete' -AllowFailure
 }
 else {

@@ -52,9 +52,31 @@ pub fn close_l120() {
     crate::infrastructure::hid_writer::close();
 }
 
+/// Stops the long-lived sampling daemon (pause, settings change, quit).
+pub fn stop_sampling() {
+    crate::infrastructure::cli::shutdown();
+}
+
 /// What this process can do with PawnIO (temperature/power need it on Windows).
 pub fn pawnio_status() -> crate::application::PawnIoStatus {
     crate::infrastructure::pawnio::status()
+}
+
+/// Whether this process is elevated, and whether it could ask.
+pub fn elevation() -> crate::infrastructure::elevation::Elevation {
+    crate::infrastructure::elevation::state()
+}
+
+/// Asks Windows for administrator rights and relaunches elevated. `true` means
+/// the elevated copy took over and this process should exit; `false` means the
+/// user declined the prompt.
+pub fn request_elevation() -> Result<bool, String> {
+    use crate::infrastructure::elevation::Outcome;
+    match crate::infrastructure::elevation::request()? {
+        Outcome::Launched => Ok(true),
+        Outcome::Declined => Ok(false),
+        Outcome::Unsupported => Err("elevation is not available on this platform".to_owned()),
+    }
 }
 
 /// Runs the bundled PawnIO installer, then reports the new status.
@@ -85,6 +107,12 @@ pub fn autostart_enabled() -> bool {
     crate::infrastructure::autostart::is_enabled()
 }
 
+/// Retires a logon entry left by a build that started elevated (see the
+/// adapter); a no-op unless this process runs elevated.
+pub fn migrate_autostart() {
+    crate::infrastructure::autostart::migrate();
+}
+
 pub fn set_autostart(enabled: bool) -> Result<(), String> {
     if enabled {
         crate::infrastructure::autostart::enable()
@@ -93,9 +121,10 @@ pub fn set_autostart(enabled: bool) -> Result<(), String> {
     }
 }
 
-/// Live telemetry, always from the `sudokooler` daemon.
-pub fn sample(config_path: Option<&str>) -> Result<Sample, AppError> {
-    let source = CliDaemon::new(config_path.map(str::to_owned));
+/// Live telemetry, always from the `sudokooler` daemon. One process feeds
+/// every sample; `interval_ms` is the cadence it is started with.
+pub fn sample(config_path: Option<&str>, interval_ms: u32) -> Result<Sample, AppError> {
+    let source = CliDaemon::new(config_path.map(str::to_owned), interval_ms);
     let telemetry = crate::application::use_cases::sample(&source)?;
     Ok(Sample {
         telemetry,

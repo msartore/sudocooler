@@ -15,6 +15,7 @@ PawnIO telemetry.
 | `build-linux.sh` | Builds app + daemon for Linux, stages `dist/sudocooler-linux-portable/`, tars it, and copies the NSH archive to the update-manifest name `dist/sudocooler-<version>-linux-x86_64.tar.gz`. Bundles the upstream udev rule; no PawnIO downloads. |
 | `sudocooler.iss` | Inno Setup script for the setup executable. |
 | `install.ps1` | Installs the extracted portable package per-user, creates a Start Menu shortcut, registers the elevated logon task, optionally installs PawnIO. |
+| `register-task.ps1` | Writes the elevated `ONLOGON` task definition (XML) and creates it; used by `install.ps1` and the setup executable. |
 | `uninstall.ps1` | Removes the task, shortcut, daemon path variable and install folder. |
 
 ## Prerequisites
@@ -191,11 +192,11 @@ The script:
    working directory, so the app's relative daemon lookup would otherwise fail.
 4. Creates `%APPDATA%\Microsoft\Windows\Start Menu\Programs\sudocooler.lnk`.
 5. Registers the exact task the app itself uses, so the in-app **Start at
-   login** switch sees and can manage it:
-
-   ```text
-   schtasks /Create /TN sudocooler /TR "<install dir>\sudocooler.exe" /SC ONLOGON /RL HIGHEST /F
-   ```
+   login** switch sees and can manage it. The definition is written as XML and
+   created with `schtasks /Create /XML`, because `/TR` splits an executable path
+   containing spaces (earlier builds stored `Command=C:\Program` and failed with
+   `0x80070002`). Registering it needs administrator rights; without them the
+   script warns and leaves the switch to the app.
 
 Every change is guarded by `ShouldProcess`, so `-WhatIf` previews everything
 and `-Confirm` prompts. `-SkipTask` registers no task (the Start Menu shortcut

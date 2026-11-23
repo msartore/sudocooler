@@ -9,7 +9,7 @@
 #endif
 
 #define AppName "sudocooler"
-#define AppVersion "0.1.7"
+#define AppVersion "0.1.15"
 #define AppPublisher "msartore"
 #define AppURL "https://msartore.dev"
 #define AppExe "sudocooler.exe"
@@ -51,9 +51,16 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 Name: "{group}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch-elevated.vbs"""; IconFilename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch-elevated.vbs"""; IconFilename: "{app}\{#AppExe}"; Tasks: desktopicon
 
+[Registry]
+; Clear a per-user Run entry a 0.1.14 install may have written, so it cannot
+; start the app unelevated next to the elevated task.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "{#AppName}"; ValueType: none; Flags: dontcreatekey uninsdeletevalue
+
 [Run]
 ; Elevated logon task: CPU temperature and package power need PawnIO elevation.
-Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN sudocooler /TR ""{app}\{#AppExe}"" /SC ONLOGON /RL HIGHEST /F"; Flags: runhidden; StatusMsg: "Registering elevated autostart task..."
+; The task XML is written by the script, because `schtasks /TR` splits a path
+; containing spaces (older builds stored Command=C:\Program).
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\register-task.ps1"" -Exe ""{app}\{#AppExe}"""; Flags: runhidden; StatusMsg: "Registering the elevated logon task..."
 ; Install the signed PawnIO driver only when it is missing.
 Filename: "{app}\installer\PawnIO_setup.exe"; Parameters: "/S"; Flags: runhidden skipifdoesntexist; Check: PawnIONotInstalled; StatusMsg: "Installing PawnIO driver..."
 Filename: "{sys}\wscript.exe"; Parameters: """{app}\launch-elevated.vbs"""; Description: "Launch sudocooler now"; Flags: nowait postinstall skipifsilent

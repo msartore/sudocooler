@@ -318,7 +318,7 @@ try {
     # 4. Docs, helper scripts, licenses and the final zip
     # -----------------------------------------------------------------------
     Write-Step '[4/4] Staging docs and creating the portable zip ...'
-    foreach ($name in @('install.ps1', 'uninstall.ps1', 'launch-elevated.vbs')) {
+    foreach ($name in @('install.ps1', 'uninstall.ps1', 'register-task.ps1', 'launch-elevated.vbs')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $stageDir $name) -Force
     }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination (Join-Path $stageDir 'README.md') -Force

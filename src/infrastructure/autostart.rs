@@ -1,51 +1,122 @@
 //! Logon autostart for sudocooler.
 //!
-//! Windows uses an elevated Scheduled Task (`/RL HIGHEST`), the same mechanism
-//! the installer registers, because PawnIO temperature/power need elevation.
-//! Linux uses an XDG autostart desktop entry in the current user's config.
+//! Windows uses a Task Scheduler logon task at `RunLevel Highest`, the same
+//! mechanism the installer registers, because PawnIO temperature/power need an
+//! elevated process and a `Run` entry would show a UAC prompt at sign-in. The
+//! task definition is created from XML (`schtasks /Create /XML`): `/TR` splits a
+//! path containing spaces (`C:\Program Files\...` became `Command=C:\Program`
+//! and failed with `0x80070002` in earlier builds).
 //!
-//! An older build wrote an HKCU\Run value instead; that launches unelevated, so
-//! `is_enabled` still reports it (so the toggle is accurate) and `disable`
-//! removes it.
-
-#[cfg(windows)]
-use std::process::Command;
+//! Linux uses an XDG autostart desktop entry in the current user's config.
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+use std::process::{Command, Stdio};
+
+/// `CREATE_NO_WINDOW`: schtasks.exe must not flash a console at the user.
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[cfg(windows)]
 const TASK_NAME: &str = "sudocooler";
-#[cfg(windows)]
-const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
-#[cfg(windows)]
-const RUN_NAME: &str = "sudocooler";
 
 #[cfg(windows)]
-fn run(program: &str, args: &[&str]) -> Result<String, String> {
-    let mut command = Command::new(program);
-    command.creation_flags(CREATE_NO_WINDOW);
-    let output = command
+fn tool(program: &str, args: &[&str]) -> std::io::Result<std::process::Output> {
+    Command::new(program)
         .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
-        .map_err(|error| format!("cannot run {program}: {error}"))?;
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).trim().to_owned())
-    }
 }
 
-/// The path to register, quoted so a spaced path stays one argument.
+/// XML-escapes text placed in the task definition.
 #[cfg(windows)]
-fn executable() -> Result<String, String> {
-    let exe = std::env::current_exe()
-        .map_err(|error| format!("cannot find executable: {error}"))?
-        .to_string_lossy()
-        .into_owned();
-    Ok(format!("\"{exe}\""))
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+/// The logon task: highest run level, `--minimized`, for this user.
+#[cfg(windows)]
+fn task_xml() -> Result<String, String> {
+    let exe =
+        std::env::current_exe().map_err(|error| format!("cannot find executable: {error}"))?;
+    let user = std::env::var("USERNAME").map_err(|_| "USERNAME is not set".to_owned())?;
+    let domain = std::env::var("USERDOMAIN").unwrap_or_default();
+    let user_id = if domain.is_empty() {
+        user
+    } else {
+        format!("{domain}\\{user}")
+    };
+    Ok(format!(
+        r#"<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>sudocooler at sign-in</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>{user}</UserId>
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>{exe}</Command>
+      <Arguments>--minimized</Arguments>
+    </Exec>
+  </Actions>
+</Task>
+"#,
+        user = xml_escape(&user_id),
+        exe = xml_escape(&exe.display().to_string()),
+    ))
+}
+
+/// Writes the task XML as UTF-16 LE with a BOM, as Task Scheduler expects.
+#[cfg(windows)]
+fn write_task_file(xml: &str) -> Result<std::path::PathBuf, String> {
+    let path = std::env::temp_dir().join(format!("sudocooler-task-{}.xml", std::process::id()));
+    let mut bytes = vec![0xFF, 0xFE];
+    for unit in xml.encode_utf16() {
+        bytes.extend_from_slice(&unit.to_le_bytes());
+    }
+    std::fs::write(&path, bytes).map_err(|error| format!("cannot write the task XML: {error}"))?;
+    Ok(path)
+}
+
+#[cfg(windows)]
+fn delete_legacy_run_entry() {
+    // 0.1.14 wrote a per-user Run value; it would start the app unelevated.
+    let _ = tool(
+        "reg.exe",
+        &[
+            "delete",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            "/v",
+            "sudocooler",
+            "/f",
+        ],
+    );
 }
 
 #[cfg(target_os = "linux")]
@@ -60,15 +131,22 @@ fn desktop_entry() -> Result<std::path::PathBuf, String> {
 pub fn enable() -> Result<(), String> {
     #[cfg(windows)]
     {
-        let exe = executable()?;
-        run(
+        let xml = task_xml()?;
+        let path = write_task_file(&xml)?;
+        let path_text = path.display().to_string();
+        let result = tool(
             "schtasks.exe",
-            &[
-                "/Create", "/TN", TASK_NAME, "/TR", &exe, "/SC", "ONLOGON", "/RL", "HIGHEST", "/F",
-            ],
-        )?;
-        // Drop any legacy HKCU entry so the app does not start twice.
-        let _ = run("reg.exe", &["delete", RUN_KEY, "/v", RUN_NAME, "/f"]);
+            &["/Create", "/TN", TASK_NAME, "/XML", &path_text, "/F"],
+        );
+        let _ = std::fs::remove_file(&path);
+        let output = result.map_err(|error| format!("cannot run schtasks.exe: {error}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "Task Scheduler refused the task: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+        delete_legacy_run_entry();
         Ok(())
     }
 
@@ -83,7 +161,7 @@ pub fn enable() -> Result<(), String> {
             std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
         let contents = format!(
-            "[Desktop Entry]\nType=Application\nName=sudocooler\nComment=Sudokoo CPU cooler companion\nExec={exe}\nTerminal=false\nX-GNOME-Autostart-enabled=true\n"
+            "[Desktop Entry]\nType=Application\nName=sudocooler\nComment=Sudokoo CPU cooler companion\nExec=\"{exe}\" --minimized\nTerminal=false\nX-GNOME-Autostart-enabled=true\n"
         );
         std::fs::write(&path, contents).map_err(|error| error.to_string())?;
         Ok(())
@@ -98,18 +176,8 @@ pub fn disable() -> Result<(), String> {
     #[cfg(windows)]
     {
         // A missing task is not an error (already off).
-        match run("schtasks.exe", &["/Delete", "/TN", TASK_NAME, "/F"]) {
-            Ok(_) => {}
-            Err(error) if error.is_empty() => {}
-            Err(error) => {
-                // Only surface a real failure, not "task does not exist".
-                if !error.to_ascii_lowercase().contains("cannot find") {
-                    // Continue: still try to clear the legacy entry below.
-                    let _ = error;
-                }
-            }
-        }
-        let _ = run("reg.exe", &["delete", RUN_KEY, "/v", RUN_NAME, "/f"]);
+        let _ = tool("schtasks.exe", &["/Delete", "/TN", TASK_NAME, "/F"]);
+        delete_legacy_run_entry();
         Ok(())
     }
 
@@ -126,13 +194,13 @@ pub fn disable() -> Result<(), String> {
     Ok(())
 }
 
-/// Whether the app will start at logon (task, or a legacy HKCU entry).
+/// Whether the app will start at logon.
 pub fn is_enabled() -> bool {
     #[cfg(windows)]
     {
-        let task = run("schtasks.exe", &["/Query", "/TN", TASK_NAME]).is_ok();
-        let legacy = run("reg.exe", &["query", RUN_KEY, "/v", RUN_NAME]).is_ok();
-        task || legacy
+        tool("schtasks.exe", &["/Query", "/TN", TASK_NAME])
+            .map(|output| output.status.success())
+            .unwrap_or(false)
     }
     #[cfg(target_os = "linux")]
     {
@@ -142,4 +210,11 @@ pub fn is_enabled() -> bool {
     {
         false
     }
+}
+
+/// Removes the per-user Run entry a 0.1.14 install may have written. No-op
+/// when there is none; safe to call at startup.
+pub fn migrate() {
+    #[cfg(windows)]
+    delete_legacy_run_entry();
 }

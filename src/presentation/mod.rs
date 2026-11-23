@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use nsh_base::theme;
 use nsh_core::desktop::WindowAttributes;
-use nsh_core::element::desktop::{MenuItem, current_window, set_tray, tray};
+use nsh_core::element::desktop::{MenuItem, current_window, on_app_quit, set_tray, tray};
 use nsh_core::prelude::*;
 use nsh_core::storage::Storage;
 
@@ -102,6 +102,11 @@ impl AppState {
 
 /// Root mounted by `nsh.json` and `cargo run`.
 pub fn app() -> impl IntoElement {
+    // A second copy while the elevated one runs cannot reach NSH's mutex across
+    // the integrity boundary; focus the existing window and exit before this
+    // one is shown (two samplers must never write the same cooler).
+    let _ = crate::infrastructure::elevation::focus_running_instance();
+
     // No fabricated readings: the UI shows dashes until the first real sample.
     let initial = Telemetry::new(0.0, 0, 0, 0).expect("valid zero sample");
     let state = AppState {
@@ -134,9 +139,15 @@ pub fn app() -> impl IntoElement {
         }
     });
 
-    // Read the logon-autostart state off-thread too (Windows runs reg.exe).
+    // Read the logon-autostart state off-thread too (Windows reads the Run key
+    // and retires a task left by an older build).
     spawn(async move {
-        if let Ok(enabled) = blocking(composition::autostart_enabled).await {
+        if let Ok(enabled) = blocking(|| {
+            composition::migrate_autostart();
+            composition::autostart_enabled()
+        })
+        .await
+        {
             state.autostart.set(enabled);
         }
     });
@@ -152,15 +163,26 @@ pub fn app() -> impl IntoElement {
         save_settings(&settings);
     });
 
-    // Closing the window hides it into the tray; the Quit tray item exits.
-    // Set the attribute in code as well as nsh.json: direct cargo runs do not
-    // load the app manifest.
+    // The close button hides the window into the tray; the tray's Quit is the
+    // real exit. `close_on_press` false routes the press to this handler. Set
+    // the attribute in code too: direct cargo runs do not load the manifest.
     let window = current_window();
     let mut attributes = WindowAttributes::default();
     attributes.close_on_press = Some(false);
     window.set(attributes);
     let hide_on_close = window.clone();
     window.on_close_press(move |_| hide_on_close.hide());
+
+    // A sign-in launch (`--minimized`) keeps the tray icon and hides the
+    // window once the first frame has been shown: NSH only applies `set_tray`
+    // and the other desktop commands in a shown window.
+    if std::env::args().any(|arg| arg == "--minimized") {
+        let hidden = window.clone();
+        spawn(async move {
+            timer(Duration::from_millis(400)).await;
+            hidden.hide();
+        });
+    }
 
     // System tray: always available, with a live pause/resume action.
     let tray_running = state.running;
@@ -175,12 +197,32 @@ pub fn app() -> impl IntoElement {
                     MenuItem::new(if running { "Pause" } else { "Resume" })
                         .on_select(move || tray_running.update(|value| *value = !*value)),
                     MenuItem::new("Quit").on_select(move || {
+                        composition::stop_sampling();
                         composition::close_l120();
                         std::process::exit(0);
                     }),
                 ])
                 .on_click(move |_| current_window().show()),
         );
+    });
+
+    // Pausing stops the sampling process too, so it cannot fill its pipe with
+    // readings nobody reads; resuming starts a new one on the next tick.
+    let was_running = std::cell::Cell::new(true);
+    effect(move || {
+        let running = state.running.get();
+        if was_running.get() && !running {
+            // Off the UI thread: the sampler may be in the middle of a read.
+            spawn(async {
+                let _ = blocking(composition::stop_sampling).await;
+            });
+        }
+        was_running.set(running);
+    });
+
+    // Every exit path (the tray's Quit included) must take the daemon with it.
+    on_app_quit(|| async {
+        composition::stop_sampling();
     });
 
     // A 100 ms heartbeat. Sampling runs on a blocking thread so spawning the
@@ -210,7 +252,7 @@ pub fn app() -> impl IntoElement {
         state.sampling.set(true);
         spawn(async move {
             let outcome = blocking(move || {
-                let sample = composition::sample(config.as_deref());
+                let sample = composition::sample(config.as_deref(), settings.interval_ms);
                 let write_error = match (&sample, is_l120) {
                     (Ok(result), true) => composition::write_l120(&result.telemetry, unit).err(),
                     _ => None,
@@ -257,6 +299,24 @@ pub fn refresh_pawnio(state: AppState) {
     spawn(async move {
         if let Ok(status) = blocking(composition::pawnio_status).await {
             state.pawnio.set(Some(status));
+        }
+    });
+}
+
+/// Asks Windows for administrator rights; when the elevated copy takes over,
+/// this process exits (the sampling daemon goes with it).
+pub fn request_admin(state: AppState) {
+    let status = state.update_status;
+    let error = state.error;
+    spawn(async move {
+        match blocking(composition::request_elevation).await {
+            Ok(Ok(true)) => {
+                let _ = blocking(composition::stop_sampling).await;
+                std::process::exit(0);
+            }
+            Ok(Ok(false)) => status.set("Elevation cancelled.".to_owned()),
+            Ok(Err(message)) => error.set(Some(format!("Elevation: {message}"))),
+            Err(_) => error.set(Some("Elevation request failed".to_owned())),
         }
     });
 }

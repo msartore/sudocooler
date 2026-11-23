@@ -25,15 +25,16 @@ The cooler displays numeric telemetry, not arbitrary images or wallpapers.
 
 ## Features
 
-- **Live telemetry** — CPU temperature, package power, load and core clock with
-  pause/resume and rescan.
+- **Live telemetry** - CPU temperature, package power, load and core clock with
+  pause/resume and rescan. One long-lived daemon process feeds every sample, so
+  the app does not spawn a process per reading.
 - **L120 streaming** — a 19-byte telemetry frame is sent to the ENERGLO 360 on
   each tick; the display opens once and closes on quit.
 - **One Home screen** — telemetry and a preview of the cooler's panel.
 - **Home top bar** — **Settings** opens a modal with polling, temperature unit,
   autostart, self-update and about.
-- **System tray** — closing the window hides the app into the tray; opening it
-  again brings the existing instance forward.
+- **System tray** - closing the window hides the app into the tray; opening the
+  icon brings the window forward, and Quit in the tray menu exits.
 
 ## Build and run
 
@@ -75,9 +76,11 @@ sysfs with no elevation; HID access needs the udev rule shipped in the submodule
 ### Autostart
 
 **Start at login** in Settings manages a Windows Scheduled Task named `sudocooler`
-(`/SC ONLOGON /RL HIGHEST`, no console window), which provides the elevation the
-Windows telemetry backend needs. On Linux the same setting writes an XDG entry at
-`~/.config/autostart/sudocooler.desktop`.
+(`ONLOGON`, `HighestAvailable`, `--minimized`, no console window), which provides
+the elevation the Windows telemetry backend needs. The task is created from XML:
+`schtasks /TR` splits an executable path containing spaces, which is why earlier
+builds stored `Command=C:\Program` and failed at every sign-in. On Linux the same
+setting writes an XDG entry at `~/.config/autostart/sudocooler.desktop`.
 
 ### Updates
 
